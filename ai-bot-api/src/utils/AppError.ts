@@ -1,0 +1,19 @@
+import type { ApiErrorCode } from "../types/api.js";
+
+export class AppError extends Error {
+  readonly statusCode: number;
+  readonly code: ApiErrorCode;
+  readonly details?: unknown;
+
+  constructor(
+    statusCode: number,
+    code: ApiErrorCode,
+    message: string,
+    details?: unknown,
+  ) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
