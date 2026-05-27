@@ -1,5 +1,6 @@
 export type ApiErrorCode =
   | "BAD_REQUEST"
+  | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "LLM_SERVICE_ERROR"
   | "INTERNAL_SERVER_ERROR";

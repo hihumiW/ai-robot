@@ -1,14 +1,12 @@
 import { MoreVertical } from "@lucide/vue";
-import { defineComponent, provide } from "vue";
+import { defineComponent } from "vue";
 import ChatConversation from "./ChatConversation";
 import PromptBox from "./PromptBox";
-import { CHAT_CONTEXT_INJECT_KEY, useChat } from "../composition/useChat";
 
 export default defineComponent({
   name: "ChatPanel",
   setup() {
-    const chat = useChat();
-    provide(CHAT_CONTEXT_INJECT_KEY, chat);
+ 
 
     return () => (
       <section class="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0d0e] text-zinc-100">

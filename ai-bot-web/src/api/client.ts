@@ -21,7 +21,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 export async function apiRequest<TData, TBody = unknown>(
   path: string,
   options: ApiRequestOptions<TBody> = {}
-): Promise<ApiResponse<TData>> {
+): Promise<TData> {
   const { body, headers, ...restOptions } = options;
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -36,13 +36,10 @@ export async function apiRequest<TData, TBody = unknown>(
   const payload = (await response.json()) as ApiResponse<TData>;
 
   if (!response.ok && payload.ok) {
-    return {
-      ok: false,
-      message: `API request failed: ${response.status}`
-    };
+    throw Error( `API request failed: ${payload.message || response.status}`)
   }
 
-  return payload;
+  return payload.data as TData;
 }
 
 export interface StreamChatRequestOptions {

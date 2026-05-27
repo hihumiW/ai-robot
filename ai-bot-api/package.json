@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "dayjs": "^1.11.20",
     "express": "^4.19.2",
+    "mysql2": "^3.22.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
