@@ -18,7 +18,8 @@ export type ChatMessagePatch = Partial<
 >;
 
 export interface SendChatRequest {
-  history: LlmChatMessage[];
+  conversationId : string;
+  content : string;
 }
 
 export interface SendChatResponse {

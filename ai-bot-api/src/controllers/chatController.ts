@@ -1,9 +1,11 @@
 import type { RequestHandler, Response } from "express";
 import type { ApiResponse } from "../types/api.js";
-import type { ChatRequestDto, ChatResponseDto } from "../types/chat.js";
+import type { ChatMessageDto, ChatRequestDto, ChatResponseDto } from "../types/chat.js";
 import { AppError } from "../utils/AppError.js";
 import { openChatCompletionStream } from "../services/lmStudioClient.js";
 import { chatRequestSchema } from "../validators/chatSchemas.js";
+import { createMessage, listMessagesByConversationId } from "../repositories/messageRepository.js";
+import { MessageDto } from "../types/conversation.js";
 
 type ChatStreamEvent = "chunk" | "done" | "error";
 
@@ -16,6 +18,13 @@ const writeSseEvent = (
   res.write(`event: ${eventName}\n`);
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 };
+
+const toChatMessageDto = (message : MessageDto) : ChatMessageDto  => {
+  return {
+    role : message.role,
+    content : message.content
+  }
+}
 
 export const postChat: RequestHandler<
   Record<string, never>,
@@ -34,10 +43,27 @@ export const postChat: RequestHandler<
         parsedBody.error.flatten(),
       );
     }
+    const { conversationId, content } = parsedBody.data;
+
+    //将当前的对话新增到历史记录中
+    const insertedUserMessage = await createMessage({ 
+      conversationId,
+      role : 'user',
+      content 
+    });
+
+    if(!insertedUserMessage){
+      throw new AppError(500, "INTERNAL_SERVER_ERROR", "插入用户消息失败")
+    }
+    
+    //再查询出当前会话的所有历史消息
+     const historyMessages = await listMessagesByConversationId(conversationId);
+    // 将数据库返回的 MessageDto 转换为 LLM需要的 ChatMessageDto
+     const llmHistoryMessages = historyMessages.map(message => toChatMessageDto(message));
 
     // 第二步：先连通 LM Studio，只有模型流可读时才开始写浏览器 SSE 响应。
     const completionStream = await openChatCompletionStream(
-      parsedBody.data.history,
+      llmHistoryMessages,
     );
 
     // 第三步：设置 SSE 响应头，让浏览器可以边收边渲染。
@@ -68,6 +94,16 @@ export const postChat: RequestHandler<
       reply: assistantReply,
     });
 
+   const insertedAssistantMessage = await createMessage({
+      conversationId,
+      role : 'assistant',
+      content : assistantReply
+    });
+
+    if(!insertedAssistantMessage.id){
+      throw new AppError(500, 'INTERNAL_SERVER_ERROR', '插入assistant消息失败');
+    }
+
     return res.end();
   } catch (error) {
     // 第六步：如果流已经开始，只能通过 SSE error 事件通知前端。
@@ -83,3 +119,4 @@ export const postChat: RequestHandler<
     return next(error);
   }
 };
+

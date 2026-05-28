@@ -8,9 +8,13 @@ export const chatMessageSchema = z.object({
 });
 
 export const chatRequestSchema = z.object({
-  history: z
-    .array(chatMessageSchema)
-    .min(1, "History array must contain at least one message."),
+  conversationId : z.string().nonempty(),
+  content : z.string().nonempty(),
 });
 
+export const getConversationMessageParamsSchema =  z.object({
+  conversationId : z.string().nonempty(),
+}); ;
+
 export type ChatRequestInput = z.infer<typeof chatRequestSchema>;
+

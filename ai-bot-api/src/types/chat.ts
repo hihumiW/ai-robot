@@ -6,7 +6,8 @@ export interface ChatMessageDto {
 }
 
 export interface ChatRequestDto {
-  history: ChatMessageDto[];
+  conversationId : string;
+  content : string;
 }
 
 export interface ChatResponseDto {

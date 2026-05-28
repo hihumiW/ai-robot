@@ -35,7 +35,7 @@ export const postConversation: RequestHandler<
 
 //获取会话列表控制器
 export const getConversations: RequestHandler<
-  null,
+  Record<string, never>,
   ApiResponse<GetConversationsResponseDto>
 > = async (request, response, next) => {
   try {

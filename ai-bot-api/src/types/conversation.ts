@@ -1,40 +1,5 @@
 import type { ChatRole } from "./chat.js";
 
-
-
-export interface MessageDto {
-  id: string;
-  conversationId: string;
-  role: ChatRole;
-  content: string;
-  sequenceNo: number;
-  createdAt: string;
-}
-
-export interface CreateDemoConversationRequestDto {
-  title?: string;
-}
-
-export interface CreateDemoMessageRequestDto {
-  role: ChatRole;
-  content: string;
-}
-
-export interface CreateDemoConversationResponseDto {
-  conversation: ConversationDto;
-}
-
-export interface CreateDemoMessageResponseDto {
-  message: MessageDto;
-}
-
-export interface ListDemoMessagesResponseDto {
-  messages: MessageDto[];
-}
-
-
-//------my Code
-
 // 一个完整的会话数据
 export interface ConversationDto{
   id : string;
@@ -56,5 +21,22 @@ export interface CreateConversationResponseDto{
 
 // 查询会话列表出参
 export interface GetConversationsResponseDto{
-  conversations : ConversationDto[];
+  conversations : ConversationDto[]; 
+}
+
+export interface MessageDto {
+  id: string;
+  conversationId: string;
+  role: ChatRole;
+  content: string;
+  sequenceNo: number;
+  createdAt: string;
+}
+
+export interface GetConversationMessageParamsDto{
+  conversationId : string;
+}
+
+export interface GetConversationMessageResponseDto {
+  messages: MessageDto[];
 }

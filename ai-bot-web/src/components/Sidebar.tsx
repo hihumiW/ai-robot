@@ -8,10 +8,11 @@ import {
   UserRound,
 } from "@lucide/vue";
 import clsx from "clsx";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, unref } from "vue";
 import Button from "./Button";
 import { useQuery } from "@tanstack/vue-query";
 import { fetchConversations } from "../api/conversations";
+import { useChatContext } from "../composition/useChat";
 
 const textTransition =
   "overflow-hidden whitespace-nowrap transition-[opacity,max-width] duration-200 ease-out";
@@ -20,6 +21,8 @@ export default defineComponent({
   name: "Sidebar",
   setup() {
     const collapsed = ref(false);
+
+    const { currentConversationId, setNewChat } = useChatContext();
 
     const conversationsQr = useQuery({
       queryKey: [fetchConversations.queryKey],
@@ -57,7 +60,7 @@ export default defineComponent({
           {conversations.map((conversation, index) => (
             <Button
               key={conversation.id}
-              class={itemClass(index === 0)}
+              class={itemClass(conversation.id === unref(currentConversationId))}
               title={conversation.title!}
             >
               <span class={["truncate text-left", textClass()]}>
@@ -111,7 +114,7 @@ export default defineComponent({
           </header>
 
           <nav class="space-y-1 px-3">
-            <Button class={itemClass(false)} title="新增会话">
+            <Button class={itemClass(false)} title="新增会话" onClick={setNewChat}>
               <MessageSquarePlus size={17} class="shrink-0" />
               <span class={textClass()}>新增会话</span>
             </Button>

@@ -7,18 +7,29 @@ import type {
   SendChatRequest
 } from '../types/chat';
 import { getRamdomId } from '../utils';
+import { createConversation, fetchConversations } from '../api/conversations';
+import { useQueryClient } from '@tanstack/vue-query';
 
 export interface ChatContext {
+  //当前会话id
+  currentConversationId : Readonly<Ref<string | null>>;
+  //当前会话记录
   chatMessages: Readonly<Ref<readonly ChatMessage[]>>;
   isGenerating: Readonly<Ref<boolean>>;
   sendMessage: (content: string) => Promise<void>;
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
+  setNewChat : () => void;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
   Symbol('ChatContext');
 
 export const useChat = (): ChatContext => {
+
+  const queryClient = useQueryClient();
+
+  const currentConversationId = ref<string | null>(null);
+
   const chatMessages = ref<ChatMessage[]>([]);
 
   const appendMessage = (message: ChatMessage) => {
@@ -57,6 +68,14 @@ export const useChat = (): ChatContext => {
       return;
     }
 
+    //如果当前是新增会话的话， 先建立会话
+    if(!currentConversationId.value){
+      // 只取前100字， 作为会话名称
+      const { conversation : createdConversation } = await createConversation(trimmedContent.slice(0, 100));
+      currentConversationId.value = createdConversation.id;
+      queryClient.invalidateQueries({ queryKey : [fetchConversations.queryKey]});
+    }
+
     const userMessageId = getRamdomId();
     const assistantMessageId = getRamdomId();
 
@@ -71,7 +90,8 @@ export const useChat = (): ChatContext => {
 
     // 第三步：只把用户消息加入请求历史，避免把空的 assistant 占位消息发给模型。
     const requestBody: SendChatRequest = {
-      history: normalizeLlmChatMessages(chatMessages.value)
+      conversationId : currentConversationId.value,
+      content,
     };
 
     // 第四步：追加 assistant 占位消息，用 sending 状态触发 ChatMessage loading。
@@ -124,11 +144,20 @@ export const useChat = (): ChatContext => {
     }
   };
 
+
+  const setNewChat = () => {
+    if(!currentConversationId.value) return; 
+    currentConversationId.value = null;
+    chatMessages.value = [];
+  }
+
   return {
+    currentConversationId : readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
     isGenerating: readonly(isGenerating),
     sendMessage,
-    updateMessage
+    updateMessage,
+    setNewChat
   };
 };
 
