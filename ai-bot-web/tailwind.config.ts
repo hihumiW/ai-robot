@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import typography from '@tailwindcss/typography';
 
 export default {
   content: ['./index.html', './src/**/*.{vue,ts,tsx}'],
@@ -17,5 +18,5 @@ export default {
       }
     }
   },
-  plugins: []
+  plugins: [typography]
 } satisfies Config;

@@ -18,13 +18,12 @@ export default defineComponent({
             <ChatMessage
               key={message.id}
               role={message.role}
+              content={message.content}
               status={message.status}
               loading={loading}
               hint="AI 正在思考..."
               errorMessage={message.errorMessage}
-            >
-              {message.content}
-            </ChatMessage>
+            />
           );
         })}
       </div>

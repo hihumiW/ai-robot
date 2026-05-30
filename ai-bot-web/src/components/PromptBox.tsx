@@ -90,10 +90,10 @@ export default defineComponent<PromptBoxProps>({
         />
 
         <div class="flex shrink-0 items-center gap-1.5 text-zinc-300">
-          <Button class="hidden items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700/70 hover:text-white sm:flex">
+          {/* <Button class="hidden items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700/70 hover:text-white sm:flex">
             Gemma4
             <ChevronDown size={14} />
-          </Button>
+          </Button> */}
           <Button class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-700/70 hover:text-white">
             <Mic size={18} />
           </Button>
