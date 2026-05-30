@@ -14,9 +14,14 @@ import type {
   SendChatRequest,
 } from "../types/chat";
 import { getRamdomId } from "../utils";
-import { createConversation, fetchConversations } from "../api/conversations";
+import {
+  createConversation as createConversationApi,
+  deleteConversation as deleteConversationApi,
+  fetchConversations,
+  updateConversation as updateConversationApi,
+} from "../api/conversations";
 import { useQueryClient, useMutation } from "@tanstack/vue-query";
-import { getConversationMessages } from "../api/messages";
+import { getConversationMessages as getConversationMessagesApi } from "../api/messages";
 import { normalizeHistoryMessage } from "../adapter/chatAdapter";
 import { useToast } from "./useToast";
 
@@ -30,6 +35,8 @@ export interface ChatContext {
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
   setNewChat: () => void;
   selectConversation: (conversationId: string) => Promise<void>;
+  deleteConversation :(conversationId: string) => Promise<void>;
+  renameConversation: (conversationId: string, title: string) => Promise<void>;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
@@ -83,7 +90,7 @@ export const useChat = (): ChatContext => {
     //如果当前是新增会话的话， 先建立会话
     if (!currentConversationId.value) {
       // 只取前100字， 作为会话名称
-      const { conversation: createdConversation } = await createConversation(
+      const { conversation: createdConversation } = await createConversationApi(
         trimmedContent.slice(0, 100),
       );
       currentConversationId.value = createdConversation.id;
@@ -166,11 +173,12 @@ export const useChat = (): ChatContext => {
     chatMessages.value = [];
   };
 
+  //获取会话消息历史
   const {
     mutateAsync: getConversationMessagesAsync,
     isPending: isConversationMessagesFetching,
   } = useMutation({
-    mutationFn: getConversationMessages,
+    mutationFn: getConversationMessagesApi,
   });
   const selectConversation = async (conversationId: string) => {
     if (
@@ -191,6 +199,56 @@ export const useChat = (): ChatContext => {
     }
   };
 
+  //删除会话
+  const {
+    mutateAsync: deleteConversationAsync,
+    isPending: isDeleteConversationLoading,
+  } = useMutation({
+    mutationFn: deleteConversationApi,
+  });
+
+  const deleteConversation = async (conversationId: string) => {
+    if (!conversationId || isDeleteConversationLoading.value) return;
+    try {
+      const result = await deleteConversationAsync(conversationId);
+      if (!result) throw Error("删除会话失败");
+      toast.success("会话删除成功");
+      queryClient.invalidateQueries({
+        queryKey: [fetchConversations.queryKey],
+      });
+      if (currentConversationId.value === conversationId) {
+        setNewChat();
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("删除会话失败");
+    }
+  };
+
+  // 重命名会话
+  const {
+    mutateAsync: renameConversationAsync,
+    isPending: isRenameConversationLoading,
+  } = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) =>
+      updateConversationApi(id, title),
+  });
+
+  const renameConversation = async (conversationId: string, title: string) => {
+    if (!conversationId || !title.trim() || isRenameConversationLoading.value) return;
+    try {
+      const result = await renameConversationAsync({ id: conversationId, title: title.trim() });
+      if (!result) throw Error("重命名会话失败");
+      toast.success("会话重命名成功");
+      queryClient.invalidateQueries({
+        queryKey: [fetchConversations.queryKey],
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error("重命名会话失败");
+    }
+  };
+
   return {
     currentConversationId: readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
@@ -199,6 +257,8 @@ export const useChat = (): ChatContext => {
     updateMessage,
     setNewChat,
     selectConversation,
+    deleteConversation,
+    renameConversation,
   };
 };
 

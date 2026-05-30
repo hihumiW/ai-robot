@@ -40,3 +40,10 @@ export interface GetConversationMessageParamsDto{
 export interface GetConversationMessageResponseDto {
   messages: MessageDto[];
 }
+
+
+
+export interface DeleteConversationByIdParamsDto {
+  conversationId : string;
+}
+

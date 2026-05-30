@@ -21,3 +21,4 @@ export interface CreateConversationRequestDto{
 export interface CreateConversationResponseDto{
   conversation : ConversationDto
 }
+

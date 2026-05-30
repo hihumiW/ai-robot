@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mysqlPool } from "../db/mysql.js";
 
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import type { ConversationDto } from "../types/conversation.js";
 import { formatDateToString } from "../utils/date.js";
 
@@ -75,4 +75,22 @@ export const listConversations = async() : Promise<ConversationDto[]> => {
     const sql = `SELECT * FROM conversations`;
     const [rows] = await mysqlPool.execute<ConversationRow[]>(sql);
     return rows.map(row => toConversationDto(row));
+}
+
+
+// 删除会话
+export const deleteConversationById = async (conversationId : string) : Promise<boolean> => {
+  const sql = `DELETE FROM conversations WHERE id = ?`;
+  const [result] = await mysqlPool.execute<ResultSetHeader>(sql, [conversationId]);
+
+  //返回受影响的条数是否大于0
+  return result.affectedRows > 0;
+}
+
+// 更新会话标题
+export const updateConversationTitle = async (conversationId : string, title : string) : Promise<boolean> => {
+  const sql = `UPDATE conversations SET title = ?, update_at = NOW() WHERE id = ?`;
+  const [result] = await mysqlPool.execute<ResultSetHeader>(sql, [title, conversationId]);
+
+  return result.affectedRows > 0;
 }

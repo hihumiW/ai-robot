@@ -16,3 +16,19 @@ export const createConversation = async (title? : string) => {
         body : { title }
     });
 }
+
+
+// 删除会话
+export const deleteConversation = async (conversationId : string) => {
+    return apiRequest<boolean>(`/conversations/${conversationId}`, {
+        method : 'DELETE'
+    });
+}
+
+// 重命名会话
+export const updateConversation = async (conversationId: string, title: string) => {
+    return apiRequest<boolean, { title: string }>(`/conversations/${conversationId}`, {
+        method: 'PUT',
+        body: { title }
+    });
+}
