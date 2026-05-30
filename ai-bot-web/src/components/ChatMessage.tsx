@@ -45,7 +45,7 @@ export default defineComponent({
 
     const renderAssistantMessage = (content: VNodeChild) => (
       <div class="flex w-full items-start gap-3">
-        <article class="min-w-0 flex-1 rounded-[26px] bg-[#151516] px-6 py-5 text-[15px] leading-7 text-zinc-300 shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+        <article class="min-w-0 flex-1 px-6 py-5 text-[15px] leading-7 text-zinc-300 shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div class="space-y-5 whitespace-pre-wrap">{content}</div>
         </article>
       </div>

@@ -69,7 +69,7 @@ export default defineComponent<PromptBoxProps>({
     return () => (
       <div
         class={[
-          'flex w-full items-end gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 shadow-[0_18px_60px_rgba(0,0,0,0.34)] transition-colors hover:bg-[#252526]',
+          'flex w-full items-center gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 shadow-[0_18px_60px_rgba(0,0,0,0.34)] transition-colors hover:bg-[#252526]',
           props.compact ? 'min-h-14' : 'min-h-16'
         ]}
       >

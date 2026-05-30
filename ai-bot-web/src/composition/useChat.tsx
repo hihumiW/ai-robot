@@ -1,6 +1,5 @@
-import { computed, inject, type InjectionKey, readonly, ref, type Ref } from 'vue';
+import { computed, inject, type InjectionKey, readonly, ref, type Ref, unref } from 'vue';
 import { streamChatRequest } from '../api/client';
-import { normalizeLlmChatMessages } from '../adapter/chatAdapter';
 import type {
   ChatMessage,
   ChatMessagePatch,
@@ -8,7 +7,10 @@ import type {
 } from '../types/chat';
 import { getRamdomId } from '../utils';
 import { createConversation, fetchConversations } from '../api/conversations';
-import { useQueryClient } from '@tanstack/vue-query';
+import { useQueryClient, useMutation } from '@tanstack/vue-query';
+import { getConversationMessages } from '../api/messages';
+import { normalizeHistoryMessage } from '../adapter/chatAdapter';
+import { useToast } from './useToast';
 
 export interface ChatContext {
   //当前会话id
@@ -19,6 +21,7 @@ export interface ChatContext {
   sendMessage: (content: string) => Promise<void>;
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
   setNewChat : () => void;
+  selectConversation : (conversationId : string) => Promise<void>;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
@@ -27,6 +30,8 @@ export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
 export const useChat = (): ChatContext => {
 
   const queryClient = useQueryClient();
+
+     const toast = useToast();
 
   const currentConversationId = ref<string | null>(null);
 
@@ -151,13 +156,30 @@ export const useChat = (): ChatContext => {
     chatMessages.value = [];
   }
 
+  const { mutateAsync : getConversationMessagesAsync, isPending : isConversationMessagesFetching } = useMutation({
+    mutationFn : getConversationMessages,
+  })
+  const selectConversation = async (conversationId : string) => {
+    if(isConversationMessagesFetching.value || !conversationId || conversationId === unref(currentConversationId)) return;
+    try {
+         const result = await getConversationMessagesAsync(conversationId);
+    currentConversationId.value = conversationId;
+    chatMessages.value = result.messages?.map(message => normalizeHistoryMessage(message) ) ||[];
+    } catch (error) {
+        console.error('获取会话消息失败', error);
+        toast.error(`获取会话消息失败`)
+    }
+   
+  }
+
   return {
     currentConversationId : readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
     isGenerating: readonly(isGenerating),
     sendMessage,
     updateMessage,
-    setNewChat
+    setNewChat,
+    selectConversation
   };
 };
 

@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { fetchConversations } from "../api/conversations";
 import { useChatContext } from "../composition/useChat";
 
+
 const textTransition =
   "overflow-hidden whitespace-nowrap transition-[opacity,max-width] duration-200 ease-out";
 
@@ -21,13 +22,18 @@ export default defineComponent({
   name: "Sidebar",
   setup() {
     const collapsed = ref(false);
+ 
 
-    const { currentConversationId, setNewChat } = useChatContext();
+    const { currentConversationId, setNewChat, selectConversation } = useChatContext();
 
     const conversationsQr = useQuery({
       queryKey: [fetchConversations.queryKey],
       queryFn: fetchConversations,
     });
+
+    const handleConversationClick = (conversationId : string) => {
+      selectConversation(conversationId);
+    }
 
     const textClass = () =>
       clsx(
@@ -62,6 +68,7 @@ export default defineComponent({
               key={conversation.id}
               class={itemClass(conversation.id === unref(currentConversationId))}
               title={conversation.title!}
+              onClick={() => handleConversationClick(conversation.id)}
             >
               <span class={["truncate text-left", textClass()]}>
                 {conversation.title!}
