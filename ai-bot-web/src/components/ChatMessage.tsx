@@ -44,7 +44,7 @@ export default defineComponent({
     );
 
     const renderAssistantMessage = (content: VNodeChild) => (
-      <div class="flex w-full items-start gap-3">
+      <div class="flex w-full items-start gap-3 assistant-message">
         <article class="min-w-0 flex-1 px-6 py-5 text-[15px] leading-7 text-zinc-300 shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div class="space-y-5 whitespace-pre-wrap">{content}</div>
         </article>
@@ -57,7 +57,7 @@ export default defineComponent({
 
       if (props.role === 'user') {
         return (
-          <div class="flex w-full justify-end">
+          <div class="flex w-full justify-end user-message scroll-mt-8">
             <div class="max-w-[76%] whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
               {content}
             </div>

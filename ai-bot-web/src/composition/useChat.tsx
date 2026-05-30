@@ -1,37 +1,44 @@
-import { computed, inject, type InjectionKey, readonly, ref, type Ref, unref } from 'vue';
-import { streamChatRequest } from '../api/client';
+import {
+  computed,
+  inject,
+  type InjectionKey,
+  readonly,
+  ref,
+  type Ref,
+  unref,
+} from "vue";
+import { streamChatRequest } from "../api/client";
 import type {
   ChatMessage,
   ChatMessagePatch,
-  SendChatRequest
-} from '../types/chat';
-import { getRamdomId } from '../utils';
-import { createConversation, fetchConversations } from '../api/conversations';
-import { useQueryClient, useMutation } from '@tanstack/vue-query';
-import { getConversationMessages } from '../api/messages';
-import { normalizeHistoryMessage } from '../adapter/chatAdapter';
-import { useToast } from './useToast';
+  SendChatRequest,
+} from "../types/chat";
+import { getRamdomId } from "../utils";
+import { createConversation, fetchConversations } from "../api/conversations";
+import { useQueryClient, useMutation } from "@tanstack/vue-query";
+import { getConversationMessages } from "../api/messages";
+import { normalizeHistoryMessage } from "../adapter/chatAdapter";
+import { useToast } from "./useToast";
 
 export interface ChatContext {
   //当前会话id
-  currentConversationId : Readonly<Ref<string | null>>;
+  currentConversationId: Readonly<Ref<string | null>>;
   //当前会话记录
   chatMessages: Readonly<Ref<readonly ChatMessage[]>>;
   isGenerating: Readonly<Ref<boolean>>;
   sendMessage: (content: string) => Promise<void>;
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
-  setNewChat : () => void;
-  selectConversation : (conversationId : string) => Promise<void>;
+  setNewChat: () => void;
+  selectConversation: (conversationId: string) => Promise<void>;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
-  Symbol('ChatContext');
+  Symbol("ChatContext");
 
 export const useChat = (): ChatContext => {
-
   const queryClient = useQueryClient();
 
-     const toast = useToast();
+  const toast = useToast();
 
   const currentConversationId = ref<string | null>(null);
 
@@ -45,7 +52,7 @@ export const useChat = (): ChatContext => {
   const updateMessage = (messageId: string, patch: ChatMessagePatch) => {
     // 第一步：根据当前消息 ID 找到需要更新的消息。
     const targetMessage = chatMessages.value.find(
-      (message) => message.id === messageId
+      (message) => message.id === messageId,
     );
 
     if (!targetMessage) {
@@ -60,9 +67,9 @@ export const useChat = (): ChatContext => {
     // 第一步：只要存在正在请求或正在吐字的 assistant 消息，就禁用重复发送。
     chatMessages.value.some(
       (message) =>
-        message.role === 'assistant' &&
-        (message.status === 'sending' || message.status === 'streaming')
-    )
+        message.role === "assistant" &&
+        (message.status === "sending" || message.status === "streaming"),
+    ),
   );
 
   const sendMessage = async (content: string) => {
@@ -74,11 +81,15 @@ export const useChat = (): ChatContext => {
     }
 
     //如果当前是新增会话的话， 先建立会话
-    if(!currentConversationId.value){
+    if (!currentConversationId.value) {
       // 只取前100字， 作为会话名称
-      const { conversation : createdConversation } = await createConversation(trimmedContent.slice(0, 100));
+      const { conversation: createdConversation } = await createConversation(
+        trimmedContent.slice(0, 100),
+      );
       currentConversationId.value = createdConversation.id;
-      queryClient.invalidateQueries({ queryKey : [fetchConversations.queryKey]});
+      queryClient.invalidateQueries({
+        queryKey: [fetchConversations.queryKey],
+      });
     }
 
     const userMessageId = getRamdomId();
@@ -87,29 +98,29 @@ export const useChat = (): ChatContext => {
     // 第二步：用户消息立即显示，并标记为已完成。
     appendMessage({
       id: userMessageId,
-      role: 'user',
+      role: "user",
       content: trimmedContent,
-      status: 'done',
-      created: Date.now()
+      status: "done",
+      created: Date.now(),
     });
 
     // 第三步：只把用户消息加入请求历史，避免把空的 assistant 占位消息发给模型。
     const requestBody: SendChatRequest = {
-      conversationId : currentConversationId.value,
+      conversationId: currentConversationId.value,
       content,
     };
 
     // 第四步：追加 assistant 占位消息，用 sending 状态触发 ChatMessage loading。
     appendMessage({
       id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      status: 'sending',
-      created: Date.now()
+      role: "assistant",
+      content: "",
+      status: "sending",
+      created: Date.now(),
     });
 
     try {
-      let streamedContent = '';
+      let streamedContent = "";
 
       await streamChatRequest({
         body: requestBody,
@@ -118,8 +129,8 @@ export const useChat = (): ChatContext => {
           streamedContent += payload.content;
           updateMessage(assistantMessageId, {
             content: streamedContent,
-            status: 'streaming',
-            errorMessage: ''
+            status: "streaming",
+            errorMessage: "",
           });
         },
         onDone: (payload) => {
@@ -127,59 +138,67 @@ export const useChat = (): ChatContext => {
           updateMessage(assistantMessageId, {
             id: payload.id,
             content: payload.reply,
-            status: 'done',
+            status: "done",
             created: payload.created,
-            errorMessage: ''
+            errorMessage: "",
           });
         },
         onError: (payload) => {
           // 第七步：服务端在流中报错时，保留 assistant 消息并展示错误。
           updateMessage(assistantMessageId, {
-            status: 'error',
-            errorMessage: payload.message
+            status: "error",
+            errorMessage: payload.message,
           });
-        }
+        },
       });
     } catch (error) {
       // 第八步：网络错误或解析错误统一落到 assistant 的 error 状态。
       updateMessage(assistantMessageId, {
-        status: 'error',
-        errorMessage: error instanceof Error ? error.message : '发送消息失败。'
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "发送消息失败。",
       });
     }
   };
 
-
   const setNewChat = () => {
-    if(!currentConversationId.value) return; 
+    if (!currentConversationId.value) return;
     currentConversationId.value = null;
     chatMessages.value = [];
-  }
+  };
 
-  const { mutateAsync : getConversationMessagesAsync, isPending : isConversationMessagesFetching } = useMutation({
-    mutationFn : getConversationMessages,
-  })
-  const selectConversation = async (conversationId : string) => {
-    if(isConversationMessagesFetching.value || !conversationId || conversationId === unref(currentConversationId)) return;
+  const {
+    mutateAsync: getConversationMessagesAsync,
+    isPending: isConversationMessagesFetching,
+  } = useMutation({
+    mutationFn: getConversationMessages,
+  });
+  const selectConversation = async (conversationId: string) => {
+    if (
+      isConversationMessagesFetching.value ||
+      !conversationId ||
+      conversationId === unref(currentConversationId)
+    )
+      return;
     try {
-         const result = await getConversationMessagesAsync(conversationId);
-    currentConversationId.value = conversationId;
-    chatMessages.value = result.messages?.map(message => normalizeHistoryMessage(message) ) ||[];
+      const result = await getConversationMessagesAsync(conversationId);
+      currentConversationId.value = conversationId;
+      chatMessages.value =
+        result.messages?.map((message) => normalizeHistoryMessage(message)) ||
+        [];
     } catch (error) {
-        console.error('获取会话消息失败', error);
-        toast.error(`获取会话消息失败`)
+      console.error("获取会话消息失败", error);
+      toast.error(`获取会话消息失败`);
     }
-   
-  }
+  };
 
   return {
-    currentConversationId : readonly(currentConversationId),
+    currentConversationId: readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
     isGenerating: readonly(isGenerating),
     sendMessage,
     updateMessage,
     setNewChat,
-    selectConversation
+    selectConversation,
   };
 };
 
@@ -187,7 +206,7 @@ export const useChatContext = (): ChatContext => {
   const context = inject(CHAT_CONTEXT_INJECT_KEY);
 
   if (!context) {
-    throw new Error('useChatContext must be used under ChatPanel provider.');
+    throw new Error("useChatContext must be used under ChatPanel provider.");
   }
 
   return context;

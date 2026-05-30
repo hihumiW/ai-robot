@@ -1,12 +1,16 @@
 import { MoreVertical } from "@lucide/vue";
-import { defineComponent } from "vue";
+import { defineComponent, nextTick, ref, watch, computed } from "vue";
 import ChatConversation from "./ChatConversation";
 import PromptBox from "./PromptBox";
+import { useChatContext } from "../composition/useChat";
+import { useChatScroll } from "../composition/useChatScroll";
 
 export default defineComponent({
   name: "ChatPanel",
   setup() {
- 
+    const chat = useChatContext();
+    const scrollContainerRef = ref<HTMLDivElement | null>(null);
+    useChatScroll(scrollContainerRef, chat.chatMessages);
 
     return () => (
       <section class="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0d0e] text-zinc-100">
@@ -14,7 +18,10 @@ export default defineComponent({
           <MoreVertical size={20} />
         </header>
 
-        <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 pb-36 pt-16 sm:px-8 lg:px-12">
+        <div
+          class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 pb-36 pt-16 sm:px-8 lg:px-12"
+          ref={scrollContainerRef}
+        >
           <ChatConversation />
         </div>
 
