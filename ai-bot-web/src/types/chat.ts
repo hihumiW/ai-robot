@@ -1,5 +1,3 @@
-import type { LlmChatMessage } from "./llm";
-
 export type ChatRole = "user" | "assistant" | "system";
 
 export type ChatMessageStatus = "sending" | "streaming" | "done" | "error";
@@ -22,6 +20,12 @@ export interface SendChatRequest {
   content: string;
 }
 
+export interface RegenerateChatRequest {
+  conversationId: string;
+  messageId: string;
+  regenerateContent: string;
+}
+
 export interface SendChatResponse {
   id: string;
   created: number;
@@ -38,6 +42,7 @@ export interface ChatStreamDoneEvent {
   reply: string;
   isNewConversation?: boolean;
   generatedTitle?: string;
+  insertedUserMessageId : string;
 }
 
 export interface ChatStreamErrorEvent {

@@ -73,7 +73,7 @@ export default defineComponent<PromptBoxProps>({
           props.compact ? "min-h-14" : "min-h-16",
         ]}
       >
-        <Button class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-zinc-700/70 hover:text-white">
+        <Button variant="ghost" size="icon-md" shape="pill">
           <Plus size={20} strokeWidth={2.2} />
         </Button>
 
@@ -90,17 +90,18 @@ export default defineComponent<PromptBoxProps>({
         />
 
         <div class="flex shrink-0 items-center gap-1.5 text-zinc-300">
-          <Button class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-700/70 hover:text-white">
+          <Button variant="ghost" size="icon-md" shape="pill">
             <Mic size={18} />
           </Button>
           <Button
             onClick={isGenerating.value ? stopGenerating : triggerMessageSend}
-            class={[
-              "flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition-colors hover:bg-white",
-            ]}
+            variant="primary"
+            size="icon-md"
+            shape="pill"
+            title={isGenerating.value ? '停止生成' : '发送'}
           >
             {isGenerating.value ? (
-              <Square size={16} fill="currentColor" />
+              <Square size={16}/>
             ) : (
               <SendHorizontal size={16} />
             )}

@@ -1,5 +1,6 @@
 import {
   computed,
+  ComputedRef,
   inject,
   type InjectionKey,
   readonly,
@@ -11,6 +12,7 @@ import { streamChatRequest } from "../api/client";
 import type {
   ChatMessage,
   ChatMessagePatch,
+  RegenerateChatRequest,
   SendChatRequest,
 } from "../types/chat";
 import { getRamdomId } from "../utils";
@@ -31,6 +33,7 @@ export interface ChatContext {
   //当前会话记录
   chatMessages: Readonly<Ref<readonly ChatMessage[]>>;
   isGenerating: Readonly<Ref<boolean>>;
+  lastUserMessageId: ComputedRef<string | void>;
   sendMessage: (content: string) => Promise<void>;
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
   setNewChat: () => void;
@@ -38,6 +41,10 @@ export interface ChatContext {
   deleteConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
   stopGenerating: () => void; // 终止生成
+  regenerateContent: (
+    messageId: string,
+    regenerateContent: string,
+  ) => Promise<void>;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
@@ -73,6 +80,10 @@ export const useChat = (): ChatContext => {
     Object.assign(targetMessage, patch);
   };
 
+  const deleteMessage = (messageId: string) => {
+    chatMessages.value = chatMessages.value.filter((m) => m.id !== messageId);
+  };
+
   const isGenerating = computed(() =>
     // 第一步：只要存在正在请求或正在吐字的 assistant 消息，就禁用重复发送。
     chatMessages.value.some(
@@ -82,6 +93,81 @@ export const useChat = (): ChatContext => {
     ),
   );
 
+  const executeChatStream = async (
+    requestBody: SendChatRequest | RegenerateChatRequest,
+    path: string,
+    userMessageId: string,
+    assistantMessageId: string,
+  ) => {
+    activeAbortController.value = new AbortController();
+    try {
+      let streamedContent = "";
+      await streamChatRequest(
+        {
+          body: requestBody,
+          signal: activeAbortController.value.signal,
+          onChunk(payload) {
+            streamedContent += payload.content;
+            updateMessage(assistantMessageId, {
+              content: streamedContent,
+              status: "streaming",
+              errorMessage: "",
+            });
+          },
+          onDone(payload) {
+            if (payload.insertedUserMessageId) {
+              updateMessage(userMessageId, {
+                id: payload.insertedUserMessageId,
+              });
+            }
+            updateMessage(assistantMessageId, {
+              id: payload.id,
+              content: payload.reply,
+              created: payload.created,
+              status: "done",
+              errorMessage: "",
+            });
+            queryClient.invalidateQueries({
+              queryKey: [fetchConversations.queryKey],
+            });
+            activeAbortController.value = null;
+          },
+          onError(payload) {
+            updateMessage(assistantMessageId, {
+              status: "error",
+              errorMessage: payload.message,
+            });
+            console.error("网络错误或解析错误", payload.message);
+            activeAbortController.value = null;
+          },
+        },
+        path,
+      );
+    } catch (error) {
+      activeAbortController.value = null;
+      if (error instanceof Error && error.name === "AbortError") {
+        const assistantMsg = chatMessages.value.find(
+          (m) => m.id === assistantMessageId,
+        );
+        if (assistantMsg && assistantMsg.content.trim() === "") {
+          console.log("未开始吐字即被终止，移除空气泡占位");
+          deleteMessage(assistantMessageId);
+        } else {
+          updateMessage(assistantMessageId, {
+            status: "done", // 将状态改为 done，停止 loading 状态
+            errorMessage: "", // 清空错误信息
+          });
+        }
+        return;
+      }
+      updateMessage(assistantMessageId, {
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "发送消息失败。",
+      });
+      console.error("网络错误或解析错误", error);
+    }
+  };
+
   const sendMessage = async (content: string) => {
     // 第一步：清理用户输入，空内容不发起请求。
     const trimmedContent = content.trim();
@@ -89,8 +175,6 @@ export const useChat = (): ChatContext => {
     if (!trimmedContent || isGenerating.value) {
       return;
     }
-
-    activeAbortController.value = new AbortController();
 
     //如果当前是新增会话的话， 先建立会话
     if (!currentConversationId.value) {
@@ -118,8 +202,8 @@ export const useChat = (): ChatContext => {
 
     // 第三步：只把用户消息加入请求历史，避免把空的 assistant 占位消息发给模型。
     const requestBody: SendChatRequest = {
-      conversationId: currentConversationId.value,
-      content,
+      conversationId: currentConversationId.value!,
+      content: trimmedContent,
     };
 
     // 第四步：追加 assistant 占位消息，用 sending 状态触发 ChatMessage loading。
@@ -131,63 +215,12 @@ export const useChat = (): ChatContext => {
       created: Date.now(),
     });
 
-    try {
-      let streamedContent = "";
-
-      await streamChatRequest({
-        body: requestBody,
-        signal: activeAbortController.value.signal,
-        onChunk: (payload) => {
-          // 第五步：收到第一个 token 后进入 streaming，并持续累加文本。
-          streamedContent += payload.content;
-          updateMessage(assistantMessageId, {
-            content: streamedContent,
-            status: "streaming",
-            errorMessage: "",
-          });
-        },
-        onDone: (payload) => {
-          // 第六步：流结束后同步服务端返回的完整内容和元数据。
-          updateMessage(assistantMessageId, {
-            id: payload.id,
-            content: payload.reply,
-            status: "done",
-            created: payload.created,
-            errorMessage: "",
-          });
-          //如果是首次会话的话， LLM会根据第一轮会话生成summary作为会话title，这里刷新一下会话列表
-          // 由于会话完成后， 会话的顺序会根据update_at重新排序， 因此每次完成后都刷新一下
-          queryClient.invalidateQueries({
-            queryKey: [fetchConversations.queryKey],
-          });
-          activeAbortController.value = null;
-        },
-        onError: (payload) => {
-          // 第七步：服务端在流中报错时，保留 assistant 消息并展示错误。
-          updateMessage(assistantMessageId, {
-            status: "error",
-            errorMessage: payload.message,
-          });
-          console.error("网络错误或解析错误", payload.message);
-          activeAbortController.value = null;
-        },
-      });
-    } catch (error) {
-      activeAbortController.value = null;
-      // 第八步：网络错误或解析错误统一落到 assistant 的 error 状态。
-      if (error instanceof Error && error.name === "AbortError") {
-        updateMessage(assistantMessageId, {
-          status: "done", // 将状态改为 done，停止 loading 状态
-          errorMessage: "", // 清空错误信息
-        });
-        return;
-      }
-      updateMessage(assistantMessageId, {
-        status: "error",
-        errorMessage: error instanceof Error ? error.message : "发送消息失败。",
-      });
-      console.error("网络错误或解析错误", error);
-    }
+    await executeChatStream(
+      requestBody,
+      "/chat",
+      userMessageId,
+      assistantMessageId,
+    );
   };
 
   const setNewChat = () => {
@@ -284,10 +317,67 @@ export const useChat = (): ChatContext => {
     }
   };
 
+  //重新生成
+  const lastUserMessageId = computed(() => {
+    const userMessages = unref(chatMessages).filter(
+      (message) => message.role === "user",
+    );
+    return userMessages[userMessages.length - 1]?.id;
+  });
+  const regenerateContent: ChatContext["regenerateContent"] = async (
+    messageId: string,
+    regenerateContent: string,
+  ) => {
+    const trimmedRegenerateContent = regenerateContent.trim();
+    const conversationId = unref(currentConversationId);
+    if (!trimmedRegenerateContent || !conversationId) return;
+    const messageIndex = chatMessages.value.findIndex(
+      (message) => message.id === messageId,
+    );
+    if (
+      messageIndex === -1 ||
+      chatMessages.value[messageIndex].content === trimmedRegenerateContent
+    )
+      return;
+    //截断后续数组
+    chatMessages.value = chatMessages.value.slice(0, messageIndex);
+
+    const userMessageId = getRamdomId();
+    const assistantMessageId = getRamdomId();
+    //创建新的用户消息
+    appendMessage({
+      id: userMessageId,
+      role: "user",
+      content: trimmedRegenerateContent,
+      status: "done",
+      created: Date.now(),
+    });
+    //创建assisant 消息
+    appendMessage({
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      status: "sending",
+      created: Date.now(),
+    });
+    
+    await executeChatStream(
+      {
+        messageId,
+        conversationId,
+        regenerateContent: trimmedRegenerateContent,
+      },
+      "/regenerateChat",
+      userMessageId,
+      assistantMessageId,
+    );
+  };
+
   return {
     currentConversationId: readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
     isGenerating: readonly(isGenerating),
+    lastUserMessageId,
     sendMessage,
     updateMessage,
     setNewChat,
@@ -295,6 +385,7 @@ export const useChat = (): ChatContext => {
     deleteConversation,
     renameConversation,
     stopGenerating,
+    regenerateContent,
   };
 };
 

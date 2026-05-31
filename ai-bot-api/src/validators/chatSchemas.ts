@@ -18,3 +18,8 @@ export const getConversationMessageParamsSchema =  z.object({
 
 export type ChatRequestInput = z.infer<typeof chatRequestSchema>;
 
+export const regenerateChatRequestSchema = z.object({
+  conversationId : z.string().nonempty(),
+  messageId : z.string().nonempty(),
+  regenerateContent : z.string().nonempty(),
+})

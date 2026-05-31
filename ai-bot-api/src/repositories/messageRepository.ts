@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { mysqlPool } from "../db/mysql.js";
 import type { ChatRole } from "../types/chat.js";
 import type { MessageDto } from "../types/conversation.js";
@@ -48,13 +48,7 @@ export const createMessage = async (params: {
   // 第三步：把消息写入 messages 表。
   await mysqlPool.execute(
     "INSERT INTO messages (id, conversation_id, role, content, sequence_no) VALUES (?, ?, ?, ?, ?)",
-    [
-      messageId,
-      params.conversationId,
-      params.role,
-      params.content,
-      sequenceNo,
-    ],
+    [messageId, params.conversationId, params.role, params.content, sequenceNo],
   );
 
   // 第四步：重新查询刚创建的消息，保证返回的是数据库真实数据。
@@ -99,3 +93,12 @@ export const listMessagesByConversationId = async (
   return rows.map(toMessageDto);
 };
 
+// 根据ids删除messages
+export const deleteMessageByIds = async (ids: string[]): Promise<boolean> => {
+  if(!ids.length) return true;
+  const placeholders = ids.map(i => `?`).join(',');
+  const sql = `DELETE FROM messages WHERE id IN (${placeholders})`;
+  const [result] = await mysqlPool.execute<ResultSetHeader>(sql, ids);
+
+  return result.affectedRows > 0;
+};

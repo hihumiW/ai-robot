@@ -1,17 +1,20 @@
-import { LoaderCircle } from "@lucide/vue";
+import { Copy, Edit, LoaderCircle } from "@lucide/vue";
 import type { PropType, VNodeChild } from "vue";
-import { defineComponent } from "vue";
+import { defineComponent, ref } from "vue";
 import MarkdownIt from "markdown-it";
 import type { ChatMessageStatus, ChatRole } from "../types/chat";
 
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css"; // Vite 会自动把这个 CSS 注入到页面中
+import clsx from "clsx";
+import Button from "./Button";
+import { useToast } from "../composition/useToast";
 
-const md : MarkdownIt = new MarkdownIt({
+const md: MarkdownIt = new MarkdownIt({
   html: true, // 允许解析原生的 HTML 标签
   linkify: true, // 自动把文本中的 URL 转为可点击的 <a> 链接
   breaks: true, // 允许识别换行符为 <br>
-  highlight(str, lang) : string {
+  highlight(str, lang): string {
     if (str && hljs.getLanguage(lang)) {
       try {
         return `<pre><code class="hljs language-${lang}">${
@@ -26,9 +29,76 @@ const md : MarkdownIt = new MarkdownIt({
   },
 });
 
+const MessageAction = defineComponent({
+  name: "MessageAction",
+  props: {
+    align: {
+      type: String as PropType<"left" | "right">,
+      required: true,
+    },
+    disabled: {
+      type: Boolean,
+    },
+    actions: {
+      type: Array as PropType<string[]>,
+    },
+  },
+  emits: ["actionClick"],
+  setup(props, { slots, emit }) {
+    const showButton = (action: string) => props.actions?.includes(action);
+    const buttonsConfig = [
+      {
+        title: "复制",
+        icon: Copy,
+        action: "copy",
+      },
+      {
+        title: "编辑",
+        icon: Edit,
+        action: "edit",
+      },
+    ];
+    return () => {
+      const showActions = Boolean(props.actions?.length) && !props.disabled;
+      return (
+        <div class="flex flex-col w-full gap-y-3 group">
+          {slots?.default?.()}
+          <div
+            class={clsx("flex gap-x-2 invisible", {
+              "justify-start": props.align === "left",
+              "justify-end": props.align === "right",
+              "group-hover:visible": showActions,
+            })}
+          >
+            {buttonsConfig.map((config) => {
+              return (
+                showButton(config.action) && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    shape="rounded"
+                    title={config.title}
+                    onClick={() => emit("actionClick", config.action)}
+                  >
+                    <config.icon size={16} />
+                  </Button>
+                )
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+  },
+});
+
 export default defineComponent({
   name: "ChatMessage",
   props: {
+    id: {
+      type: String,
+      required: true,
+    },
     role: {
       type: String as PropType<ChatRole>,
       required: true,
@@ -53,8 +123,40 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    isLastUserMessage: {
+      type: Boolean,
+    },
   },
-  setup(props) {
+  emits: ["regenerateContent"],
+  setup(props, { emit }) {
+    const toast = useToast();
+    const isEditing = ref(false);
+    const editContent = ref<string>(props.content);
+
+    const handleMessageAction = (action: string) => {
+      if (action === "copy") {
+        navigator.clipboard
+          .writeText(props.content)
+          .then(() => toast.success("复制成功"))
+          .catch(() => toast.error("复制失败"));
+      }
+      if (action === "edit") {
+        isEditing.value = true;
+        editContent.value = props.content;
+      }
+    };
+
+    const handleEditCancel = () => {
+      isEditing.value = false;
+    };
+
+    const handleEditConfirm = () => {
+      isEditing.value = false;
+      const trimedContent = editContent.value.trim();
+      if (props.content === trimedContent) return;
+      emit("regenerateContent", trimedContent);
+    };
+
     const renderLoading = () => (
       <div class="mt-5 flex w-fit items-center gap-3 rounded-2xl bg-[#1d1d1f] px-4 py-3 text-sm text-zinc-400">
         <LoaderCircle size={16} class="animate-spin text-zinc-300" />
@@ -63,7 +165,7 @@ export default defineComponent({
     );
 
     const renderError = () => (
-      <div class="flex w-full items-start gap-3">
+      <div class="mt-5 flex w-full items-start gap-3">
         <article class="min-w-0 flex-1 rounded-[26px] border border-red-500/30 bg-red-500/10 px-6 py-5 text-[15px] leading-7 text-red-100 shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           {props.errorMessage || "消息发送失败，请稍后再试。"}
         </article>
@@ -73,14 +175,21 @@ export default defineComponent({
     const renderAssistantMessage = (content: string) => {
       const htmlContent = md.render(content);
       return (
-        <div class="flex w-full items-start gap-3 assistant-message">
-          <article class="min-w-0 flex-1 px-6 py-5 text-[15px] leading-7 text-zinc-300 shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
-            <div
-              class="prose prose-invert prose-zinc max-w-none text-zinc-300"
-              v-html={htmlContent}
-            />
-          </article>
-        </div>
+        <MessageAction
+          align="left"
+          actions={["copy"]}
+          disabled={props.status !== 'done'}
+          onActionClick={handleMessageAction}
+        >
+          <div class="flex w-full items-start gap-3 assistant-message">
+            <article class="min-w-0 flex-1 px-6 py-5 text-[15px] leading-7 text-zinc-300 ">
+              <div
+                class="prose prose-invert prose-zinc max-w-none text-zinc-300"
+                v-html={htmlContent}
+              />
+            </article>
+          </div>
+        </MessageAction>
       );
     };
 
@@ -90,11 +199,53 @@ export default defineComponent({
       // 第一步：每次渲染时重新读取 contetn，保证流式内容可以逐字更新。
       if (props.role === "user") {
         return (
-          <div class="flex w-full justify-end user-message scroll-mt-8">
-            <div class="max-w-[76%] whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-              {content}
+          <MessageAction
+            align="right"
+            actions={
+              ["copy", props.isLastUserMessage ? "edit" : null].filter(
+                Boolean,
+              ) as string[]
+            }
+            disabled={props.status !== 'done' || isEditing.value}
+            onActionClick={handleMessageAction}
+          >
+            <div class="flex w-full justify-end user-message scroll-mt-8">
+              {isEditing.value ? (
+                <div class="flex flex-col gap-y-3 w-full max-w-[500px]">
+                  <textarea
+                    class="w-full min-h-24 px-4 py-3 text-[15px] leading-7 bg-[#131314] text-zinc-100 rounded-[18px] border border-zinc-800 outline-none resize-none focus:border-zinc-700 transition-colors"
+                    value={editContent.value}
+                    onInput={(e) =>
+                      (editContent.value = (e.target as HTMLTextAreaElement).value)
+                    }
+                    ref={(el) => el && (el as HTMLTextAreaElement).focus()}
+                  />
+                  <div class="flex gap-x-2 justify-end text-sm">
+                    <Button
+                      variant="text"
+                      size="sm"
+                      shape="pill"
+                      onClick={handleEditCancel}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      shape="pill"
+                      onClick={handleEditConfirm}
+                    >
+                      更新
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div class="max-w-[76%] whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950">
+                  {content}
+                </div>
+              )}
             </div>
-          </div>
+          </MessageAction>
         );
       }
 

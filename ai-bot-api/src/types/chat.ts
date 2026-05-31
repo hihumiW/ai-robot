@@ -45,3 +45,9 @@ export interface LmStudioChatCompletionStreamChunk {
     };
   }>;
 }
+
+export interface RegenerateChatRequestDto {
+  conversationId : string;
+  messageId : string;
+  regenerateContent : string;
+}

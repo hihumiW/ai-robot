@@ -3,6 +3,7 @@ import type {
   ChatStreamChunkEvent,
   ChatStreamDoneEvent,
   ChatStreamErrorEvent,
+  RegenerateChatRequest,
   SendChatRequest,
 } from "../types/chat";
 
@@ -43,7 +44,7 @@ export async function apiRequest<TData, TBody = unknown>(
 }
 
 export interface StreamChatRequestOptions {
-  body: SendChatRequest;
+  body: SendChatRequest | RegenerateChatRequest; //支持发送消息 / 重新生成消息
   signal?: AbortSignal; // 支持停止
   onChunk: (payload: ChatStreamChunkEvent) => void;
   onDone: (payload: ChatStreamDoneEvent) => void;
@@ -85,9 +86,10 @@ const parseSseEvent = (rawEvent: string): ParsedSseEvent | null => {
 
 export async function streamChatRequest(
   options: StreamChatRequestOptions,
+  path: string = "/chat",
 ): Promise<void> {
   // 第一步：用 fetch 发起 POST 请求，后续通过 response.body 逐块读取 SSE。
-  const response = await fetch(`${apiBaseUrl}/chat`, {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
