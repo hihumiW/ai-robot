@@ -2,7 +2,6 @@ import { RequestHandler } from "express";
 import { ApiResponse } from "../types/api.js";
 
 import type {
-  ConversationDto,
   CreateConversationResponseDto,
   DeleteConversationByIdParamsDto,
   GetConversationsResponseDto,
@@ -62,7 +61,6 @@ export const deleteConversation : RequestHandler<
 > = async (request, response, next) => {
   try {
     const parsedParams =  deleteConversationByIdSchema.safeParse(request.params);
-    console.log('geggg', parsedParams.data);
     if(!parsedParams.success){
       throw new AppError(400, 'BAD_REQUEST', "无效的删除参数", parsedParams.error.flatten())
     }

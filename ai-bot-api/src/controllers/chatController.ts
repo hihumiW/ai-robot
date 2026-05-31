@@ -1,11 +1,26 @@
 import type { RequestHandler, Response } from "express";
 import type { ApiResponse } from "../types/api.js";
-import type { ChatMessageDto, ChatRequestDto, ChatResponseDto } from "../types/chat.js";
+import type {
+  ChatMessageDto,
+  ChatRequestDto,
+  ChatResponseDto,
+} from "../types/chat.js";
 import { AppError } from "../utils/AppError.js";
-import { openChatCompletionStream } from "../services/lmStudioClient.js";
+import {
+  createChatCompletion,
+  openChatCompletionStream,
+} from "../services/lmStudioClient.js";
 import { chatRequestSchema } from "../validators/chatSchemas.js";
-import { createMessage, listMessagesByConversationId } from "../repositories/messageRepository.js";
+import {
+  createMessage,
+  listMessagesByConversationId,
+} from "../repositories/messageRepository.js";
 import { MessageDto } from "../types/conversation.js";
+import { getChatSummaryTitlePrompt } from "../utils/prompt.js";
+import {
+  updateConversationTitle,
+  updateConversationUpdateAt,
+} from "../repositories/conversationRepository.js";
 
 type ChatStreamEvent = "chunk" | "done" | "error";
 
@@ -19,18 +34,25 @@ const writeSseEvent = (
   res.write(`data: ${JSON.stringify(payload)}\n\n`);
 };
 
-const toChatMessageDto = (message : MessageDto) : ChatMessageDto  => {
+const toChatMessageDto = (message: MessageDto): ChatMessageDto => {
   return {
-    role : message.role,
-    content : message.content
-  }
-}
+    role: message.role,
+    content: message.content,
+  };
+};
 
 export const postChat: RequestHandler<
   Record<string, never>,
   ApiResponse<ChatResponseDto> | void,
   ChatRequestDto
 > = async (req, res, next) => {
+  //监听用户是否终止了生成
+  let isAborted = false;
+  res.on("close", () => {
+    if (!res.writableEnded) {
+      isAborted = true;
+    }
+  });
   try {
     // 第一步：校验前端传入的聊天历史，避免把非法消息发给模型。
     const parsedBody = chatRequestSchema.safeParse(req.body);
@@ -43,28 +65,29 @@ export const postChat: RequestHandler<
         parsedBody.error.flatten(),
       );
     }
+
     const { conversationId, content } = parsedBody.data;
 
     //将当前的对话新增到历史记录中
-    const insertedUserMessage = await createMessage({ 
+    const insertedUserMessage = await createMessage({
       conversationId,
-      role : 'user',
-      content 
+      role: "user",
+      content,
     });
 
-    if(!insertedUserMessage){
-      throw new AppError(500, "INTERNAL_SERVER_ERROR", "插入用户消息失败")
+    if (!insertedUserMessage) {
+      throw new AppError(500, "INTERNAL_SERVER_ERROR", "插入用户消息失败");
     }
-    
+
     //再查询出当前会话的所有历史消息
-     const historyMessages = await listMessagesByConversationId(conversationId);
+    const historyMessages = await listMessagesByConversationId(conversationId);
     // 将数据库返回的 MessageDto 转换为 LLM需要的 ChatMessageDto
-     const llmHistoryMessages = historyMessages.map(message => toChatMessageDto(message));
+    const llmHistoryMessages = historyMessages.map((message) =>
+      toChatMessageDto(message),
+    );
 
     // 第二步：先连通 LM Studio，只有模型流可读时才开始写浏览器 SSE 响应。
-    const completionStream = await openChatCompletionStream(
-      llmHistoryMessages,
-    );
+    const completionStream = await openChatCompletionStream(llmHistoryMessages);
 
     // 第三步：设置 SSE 响应头，让浏览器可以边收边渲染。
     res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
@@ -78,6 +101,9 @@ export const postChat: RequestHandler<
 
     // 第四步：逐块读取模型增量文本，并立即转发给前端。
     for await (const delta of completionStream) {
+      if (isAborted) {
+        break;
+      }
       assistantReply += delta.content;
       completionId = delta.id ?? completionId;
       created = delta.created ?? created;
@@ -87,22 +113,51 @@ export const postChat: RequestHandler<
       });
     }
 
+    //将llm 生成的内容先保存
+    const insertedAssistantMessage = await createMessage({
+      conversationId,
+      role: "assistant",
+      content: assistantReply,
+    });
+
+    if (!insertedAssistantMessage.id) {
+      throw new AppError(500, "INTERNAL_SERVER_ERROR", "插入assistant消息失败");
+    }
+
+    // 第四.1步： 判断该会话是否为用户的首次会话， 如果是首次会话的话， 需要通过LLM生成一个标题总结
+    // 由于这一步属于非核心的辅助逻辑， side Effect ，因此使用try catch对异常进行隔离
+    const isNewConversation = historyMessages.length === 1;
+    let generatedTitle = null;
+    try {
+      if (isNewConversation && assistantReply && conversationId) {
+        const summaryPrompt = getChatSummaryTitlePrompt(
+          content,
+          assistantReply,
+        );
+        const summaryResponse = await createChatCompletion([
+          {
+            role: "user",
+            content: summaryPrompt,
+          },
+        ]);
+        generatedTitle = summaryResponse.choices[0]?.message?.content?.trim();
+        await updateConversationTitle(conversationId, generatedTitle);
+      }
+      //如果不是新会话， 那么要更新一下会话时间
+      if (!isNewConversation) {
+        await updateConversationUpdateAt(conversationId);
+      }
+    } catch (error) {
+      console.error(error);
+    }
     // 第五步：模型输出结束后，把完整回复发给前端，为后续持久化预留完整文本。
     writeSseEvent(res, "done", {
       id: completionId,
       created,
       reply: assistantReply,
+      isNewConversation,
+      generatedTitle,
     });
-
-   const insertedAssistantMessage = await createMessage({
-      conversationId,
-      role : 'assistant',
-      content : assistantReply
-    });
-
-    if(!insertedAssistantMessage.id){
-      throw new AppError(500, 'INTERNAL_SERVER_ERROR', '插入assistant消息失败');
-    }
 
     return res.end();
   } catch (error) {
@@ -110,7 +165,6 @@ export const postChat: RequestHandler<
     if (res.headersSent) {
       const message =
         error instanceof Error ? error.message : "模型响应流处理失败。";
-
       writeSseEvent(res, "error", { message });
       return res.end();
     }
@@ -119,4 +173,3 @@ export const postChat: RequestHandler<
     return next(error);
   }
 };
-

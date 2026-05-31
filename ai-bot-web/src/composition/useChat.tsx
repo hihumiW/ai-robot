@@ -35,8 +35,9 @@ export interface ChatContext {
   updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
   setNewChat: () => void;
   selectConversation: (conversationId: string) => Promise<void>;
-  deleteConversation :(conversationId: string) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
+  stopGenerating: () => void; // 终止生成
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
@@ -50,6 +51,8 @@ export const useChat = (): ChatContext => {
   const currentConversationId = ref<string | null>(null);
 
   const chatMessages = ref<ChatMessage[]>([]);
+
+  const activeAbortController = ref<AbortController | null>(null);
 
   const appendMessage = (message: ChatMessage) => {
     // 第一步：把新消息追加到响应式消息列表中。
@@ -86,6 +89,8 @@ export const useChat = (): ChatContext => {
     if (!trimmedContent || isGenerating.value) {
       return;
     }
+
+    activeAbortController.value = new AbortController();
 
     //如果当前是新增会话的话， 先建立会话
     if (!currentConversationId.value) {
@@ -131,6 +136,7 @@ export const useChat = (): ChatContext => {
 
       await streamChatRequest({
         body: requestBody,
+        signal: activeAbortController.value.signal,
         onChunk: (payload) => {
           // 第五步：收到第一个 token 后进入 streaming，并持续累加文本。
           streamedContent += payload.content;
@@ -149,6 +155,12 @@ export const useChat = (): ChatContext => {
             created: payload.created,
             errorMessage: "",
           });
+          //如果是首次会话的话， LLM会根据第一轮会话生成summary作为会话title，这里刷新一下会话列表
+          // 由于会话完成后， 会话的顺序会根据update_at重新排序， 因此每次完成后都刷新一下
+          queryClient.invalidateQueries({
+            queryKey: [fetchConversations.queryKey],
+          });
+          activeAbortController.value = null;
         },
         onError: (payload) => {
           // 第七步：服务端在流中报错时，保留 assistant 消息并展示错误。
@@ -156,14 +168,25 @@ export const useChat = (): ChatContext => {
             status: "error",
             errorMessage: payload.message,
           });
+          console.error("网络错误或解析错误", payload.message);
+          activeAbortController.value = null;
         },
       });
     } catch (error) {
+      activeAbortController.value = null;
       // 第八步：网络错误或解析错误统一落到 assistant 的 error 状态。
+      if (error instanceof Error && error.name === "AbortError") {
+        updateMessage(assistantMessageId, {
+          status: "done", // 将状态改为 done，停止 loading 状态
+          errorMessage: "", // 清空错误信息
+        });
+        return;
+      }
       updateMessage(assistantMessageId, {
         status: "error",
         errorMessage: error instanceof Error ? error.message : "发送消息失败。",
       });
+      console.error("网络错误或解析错误", error);
     }
   };
 
@@ -235,9 +258,13 @@ export const useChat = (): ChatContext => {
   });
 
   const renameConversation = async (conversationId: string, title: string) => {
-    if (!conversationId || !title.trim() || isRenameConversationLoading.value) return;
+    if (!conversationId || !title.trim() || isRenameConversationLoading.value)
+      return;
     try {
-      const result = await renameConversationAsync({ id: conversationId, title: title.trim() });
+      const result = await renameConversationAsync({
+        id: conversationId,
+        title: title.trim(),
+      });
       if (!result) throw Error("重命名会话失败");
       toast.success("会话重命名成功");
       queryClient.invalidateQueries({
@@ -246,6 +273,14 @@ export const useChat = (): ChatContext => {
     } catch (error) {
       console.error(error);
       toast.error("重命名会话失败");
+    }
+  };
+
+  // 终止生成
+  const stopGenerating = () => {
+    if (activeAbortController.value) {
+      activeAbortController.value.abort();
+      activeAbortController.value = null;
     }
   };
 
@@ -259,6 +294,7 @@ export const useChat = (): ChatContext => {
     selectConversation,
     deleteConversation,
     renameConversation,
+    stopGenerating,
   };
 };
 

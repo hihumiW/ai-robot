@@ -72,7 +72,7 @@ export const createConversation  = async (title = '新会话') : Promise<Convers
 
 // 获取会话列表
 export const listConversations = async() : Promise<ConversationDto[]> => {
-    const sql = `SELECT * FROM conversations`;
+    const sql = `SELECT * FROM conversations ORDER BY update_at DESC`;
     const [rows] = await mysqlPool.execute<ConversationRow[]>(sql);
     return rows.map(row => toConversationDto(row));
 }
@@ -92,5 +92,12 @@ export const updateConversationTitle = async (conversationId : string, title : s
   const sql = `UPDATE conversations SET title = ?, update_at = NOW() WHERE id = ?`;
   const [result] = await mysqlPool.execute<ResultSetHeader>(sql, [title, conversationId]);
 
+  return result.affectedRows > 0;
+}
+
+//更新会话更新时间
+export const updateConversationUpdateAt = async (conversationId : string) : Promise<boolean> => {
+  const sql = `UPDATE conversations SET update_at = NOW() WHERE id = ?`;
+  const [result] = await mysqlPool.execute<ResultSetHeader>(sql, [conversationId]);
   return result.affectedRows > 0;
 }

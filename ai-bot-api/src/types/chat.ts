@@ -14,6 +14,8 @@ export interface ChatResponseDto {
   reply: string;
   id: string;
   created: number;
+  isNewConversation? : boolean;
+  generatedTitle? : string;
 }
 
 export interface LmStudioChatCompletionRequest {

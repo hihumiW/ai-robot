@@ -6,11 +6,11 @@ import type {
   LmStudioChatCompletionStreamChunk,
 } from "../types/chat.js";
 import { AppError } from "../utils/AppError.js";
+import { getSystemPrompt } from "../utils/prompt.js";
 
 const systemMessage: ChatMessageDto = {
   role: "system",
-  content:
-    "你是一个专业的 AI 助手。请使用中文直接输出最终的回答，绝对不要包含任何形如 <think> 的思考、推理、草稿或内心独白过程。",
+  content: getSystemPrompt(),
 };
 
 export interface ChatCompletionStreamDelta {
@@ -157,6 +157,12 @@ export const openChatCompletionStream = async (
         }
       }
     } finally {
+      try {
+        // 主动通知底层流：消费者已经不想要数据了，立即关闭与大模型的 HTTP 连接！
+        await reader.cancel();
+      } catch (error) {
+         console.error("取消下游大模型流失败:", error);
+      }
       // 第九步：无论正常结束还是异常中断，都释放底层 reader。
       reader.releaseLock();
     }

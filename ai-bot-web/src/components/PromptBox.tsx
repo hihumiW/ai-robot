@@ -1,7 +1,7 @@
-import { ChevronDown, Mic, Plus, SendHorizontal } from '@lucide/vue';
-import { defineComponent, nextTick, ref } from 'vue';
-import { useChatContext } from '../composition/useChat';
-import Button from './Button';
+import { ChevronDown, Mic, Plus, SendHorizontal, Square } from "@lucide/vue";
+import { defineComponent, nextTick, ref } from "vue";
+import { useChatContext } from "../composition/useChat";
+import Button from "./Button";
 
 type PromptBoxProps = {
   compact?: boolean;
@@ -10,17 +10,17 @@ type PromptBoxProps = {
 const maxTextareaHeight = 120;
 
 export default defineComponent<PromptBoxProps>({
-  name: 'PromptBox',
+  name: "PromptBox",
   props: {
     compact: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   setup(props) {
-    const { isGenerating, sendMessage } = useChatContext();
+    const { isGenerating, sendMessage, stopGenerating } = useChatContext();
     const textareaRef = ref<HTMLTextAreaElement | null>(null);
-    const chatBoxContent = ref('');
+    const chatBoxContent = ref("");
 
     const resizeTextarea = () => {
       // 第一步：根据输入内容自动调整文本框高度。
@@ -30,11 +30,11 @@ export default defineComponent<PromptBoxProps>({
         return;
       }
 
-      textarea.style.height = 'auto';
+      textarea.style.height = "auto";
       const nextHeight = Math.min(textarea.scrollHeight, maxTextareaHeight);
       textarea.style.height = `${nextHeight}px`;
       textarea.style.overflowY =
-        textarea.scrollHeight > maxTextareaHeight ? 'auto' : 'hidden';
+        textarea.scrollHeight > maxTextareaHeight ? "auto" : "hidden";
     };
 
     const updateChatBoxContent = (event: Event) => {
@@ -53,24 +53,24 @@ export default defineComponent<PromptBoxProps>({
 
       // 第四步：先发起流式聊天，再清空输入框。
       sendMessage(content);
-      chatBoxContent.value = '';
+      chatBoxContent.value = "";
       nextTick(resizeTextarea);
     };
 
-    const handleChatBoxKeypress = (event : KeyboardEvent) => {
-      if(event.key === 'Enter' && !event.shiftKey){
+    const handleChatBoxKeypress = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         event.stopPropagation();
         triggerMessageSend();
         return false;
       }
-    }
+    };
 
     return () => (
       <div
         class={[
-          'flex w-full items-center gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 shadow-[0_18px_60px_rgba(0,0,0,0.34)] transition-colors hover:bg-[#252526]',
-          props.compact ? 'min-h-14' : 'min-h-16'
+          "flex w-full items-center gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 shadow-[0_18px_60px_rgba(0,0,0,0.34)] transition-colors hover:bg-[#252526]",
+          props.compact ? "min-h-14" : "min-h-16",
         ]}
       >
         <Button class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-200 transition-colors hover:bg-zinc-700/70 hover:text-white">
@@ -90,25 +90,23 @@ export default defineComponent<PromptBoxProps>({
         />
 
         <div class="flex shrink-0 items-center gap-1.5 text-zinc-300">
-          {/* <Button class="hidden items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700/70 hover:text-white sm:flex">
-            Gemma4
-            <ChevronDown size={14} />
-          </Button> */}
           <Button class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-700/70 hover:text-white">
             <Mic size={18} />
           </Button>
           <Button
-            onClick={triggerMessageSend}
-            disabled={isGenerating.value}
+            onClick={isGenerating.value ? stopGenerating : triggerMessageSend}
             class={[
-              'flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition-colors hover:bg-white',
-              isGenerating.value ? 'cursor-not-allowed opacity-50' : ''
+              "flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition-colors hover:bg-white",
             ]}
           >
-            <SendHorizontal size={16} />
+            {isGenerating.value ? (
+              <Square size={16} fill="currentColor" />
+            ) : (
+              <SendHorizontal size={16} />
+            )}
           </Button>
         </div>
       </div>
     );
-  }
+  },
 });

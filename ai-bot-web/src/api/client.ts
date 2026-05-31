@@ -1,12 +1,12 @@
-import type { ApiRequestOptions, ApiResponse } from '../types/api';
+import type { ApiRequestOptions, ApiResponse } from "../types/api";
 import type {
   ChatStreamChunkEvent,
   ChatStreamDoneEvent,
   ChatStreamErrorEvent,
-  SendChatRequest
-} from '../types/chat';
+  SendChatRequest,
+} from "../types/chat";
 
-export const apiBaseUrl = '/api';
+export const apiBaseUrl = "/api";
 
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`);
@@ -20,23 +20,23 @@ export async function apiGet<T>(path: string): Promise<T> {
 
 export async function apiRequest<TData, TBody = unknown>(
   path: string,
-  options: ApiRequestOptions<TBody> = {}
+  options: ApiRequestOptions<TBody> = {},
 ): Promise<TData> {
   const { body, headers, ...restOptions } = options;
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...restOptions,
     headers: {
-      'Content-Type': 'application/json',
-      ...headers
+      "Content-Type": "application/json",
+      ...headers,
     },
-    body: body === undefined ? undefined : JSON.stringify(body)
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   const payload = (await response.json()) as ApiResponse<TData>;
 
   if (!response.ok && payload.ok) {
-    throw Error( `API request failed: ${payload.message || response.status}`)
+    throw Error(`API request failed: ${payload.message || response.status}`);
   }
 
   return payload.data as TData;
@@ -44,6 +44,7 @@ export async function apiRequest<TData, TBody = unknown>(
 
 export interface StreamChatRequestOptions {
   body: SendChatRequest;
+  signal?: AbortSignal; // 支持停止
   onChunk: (payload: ChatStreamChunkEvent) => void;
   onDone: (payload: ChatStreamDoneEvent) => void;
   onError: (payload: ChatStreamErrorEvent) => void;
@@ -57,17 +58,17 @@ interface ParsedSseEvent {
 const parseSseEvent = (rawEvent: string): ParsedSseEvent | null => {
   // 第一步：按行读取 SSE 事件，分别收集 event 和 data 字段。
   const lines = rawEvent.split(/\r?\n/);
-  let event = 'message';
+  let event = "message";
   const dataLines: string[] = [];
 
   for (const line of lines) {
-    if (line.startsWith('event:')) {
-      event = line.replace(/^event:\s?/, '').trim();
+    if (line.startsWith("event:")) {
+      event = line.replace(/^event:\s?/, "").trim();
       continue;
     }
 
-    if (line.startsWith('data:')) {
-      dataLines.push(line.replace(/^data:\s?/, ''));
+    if (line.startsWith("data:")) {
+      dataLines.push(line.replace(/^data:\s?/, ""));
     }
   }
 
@@ -78,35 +79,39 @@ const parseSseEvent = (rawEvent: string): ParsedSseEvent | null => {
 
   return {
     event,
-    data: dataLines.join('\n')
+    data: dataLines.join("\n"),
   };
 };
 
 export async function streamChatRequest(
-  options: StreamChatRequestOptions
+  options: StreamChatRequestOptions,
 ): Promise<void> {
   // 第一步：用 fetch 发起 POST 请求，后续通过 response.body 逐块读取 SSE。
   const response = await fetch(`${apiBaseUrl}/chat`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(options.body)
+    body: JSON.stringify(options.body),
+    signal: options.signal,
   });
 
   // 第二步：如果后端还没进入流式响应，错误会以普通 JSON 返回。
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | ApiResponse<never>
-      | null;
-    const message = payload?.ok === false ? payload.message : `API request failed: ${response.status}`;
+    const payload = (await response
+      .json()
+      .catch(() => null)) as ApiResponse<never> | null;
+    const message =
+      payload?.ok === false
+        ? payload.message
+        : `API request failed: ${response.status}`;
 
     options.onError({ message });
     throw new Error(message);
   }
 
   if (!response.body) {
-    const message = '浏览器没有收到可读取的响应流。';
+    const message = "浏览器没有收到可读取的响应流。";
 
     options.onError({ message });
     throw new Error(message);
@@ -115,7 +120,7 @@ export async function streamChatRequest(
   // 第三步：创建 reader 和 decoder，用来把二进制流逐块转为文本。
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   try {
     while (true) {
@@ -127,9 +132,9 @@ export async function streamChatRequest(
 
       // 第四步：SSE 事件可能被拆成半包，先拼到 buffer 再按空行切分。
       buffer += decoder.decode(value, { stream: true });
-     
+
       const rawEvents = buffer.split(/\r?\n\r?\n/);
-      buffer = rawEvents.pop() ?? '';
+      buffer = rawEvents.pop() ?? "";
 
       for (const rawEvent of rawEvents) {
         const parsedEvent = parseSseEvent(rawEvent);
@@ -139,17 +144,17 @@ export async function streamChatRequest(
         }
 
         // 第五步：根据事件类型把 JSON 数据分发给聊天状态层。
-        if (parsedEvent.event === 'chunk') {
+        if (parsedEvent.event === "chunk") {
           options.onChunk(JSON.parse(parsedEvent.data) as ChatStreamChunkEvent);
           continue;
         }
 
-        if (parsedEvent.event === 'done') {
+        if (parsedEvent.event === "done") {
           options.onDone(JSON.parse(parsedEvent.data) as ChatStreamDoneEvent);
           continue;
         }
 
-        if (parsedEvent.event === 'error') {
+        if (parsedEvent.event === "error") {
           const payload = JSON.parse(parsedEvent.data) as ChatStreamErrorEvent;
 
           options.onError(payload);

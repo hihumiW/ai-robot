@@ -1,8 +1,8 @@
-import type { LlmChatMessage } from './llm';
+import type { LlmChatMessage } from "./llm";
 
-export type ChatRole = 'user' | 'assistant' | 'system';
+export type ChatRole = "user" | "assistant" | "system";
 
-export type ChatMessageStatus = 'sending' | 'streaming' | 'done' | 'error';
+export type ChatMessageStatus = "sending" | "streaming" | "done" | "error";
 
 export interface ChatMessage {
   id: string;
@@ -14,12 +14,12 @@ export interface ChatMessage {
 }
 
 export type ChatMessagePatch = Partial<
-  Pick<ChatMessage, 'id' | 'content' | 'status' | 'created' | 'errorMessage'>
+  Pick<ChatMessage, "id" | "content" | "status" | "created" | "errorMessage">
 >;
 
 export interface SendChatRequest {
-  conversationId : string;
-  content : string;
+  conversationId: string;
+  content: string;
 }
 
 export interface SendChatResponse {
@@ -36,9 +36,10 @@ export interface ChatStreamDoneEvent {
   id: string;
   created: number;
   reply: string;
+  isNewConversation?: boolean;
+  generatedTitle?: string;
 }
 
 export interface ChatStreamErrorEvent {
   message: string;
 }
-
