@@ -6,6 +6,7 @@ import {
   Transition,
   watch,
 } from "vue";
+import Button from "./Button";
 
 export default defineComponent({
   name: "Dialog",
@@ -39,13 +40,17 @@ export default defineComponent({
       }
     };
 
-    watch(() => props.show, (show) => {
-      if (show) {
-        window.addEventListener("keydown", handleKeyDown);
-      } else {
-        window.removeEventListener("keydown", handleKeyDown);
-      }
-    }, { immediate: true });
+    watch(
+      () => props.show,
+      (show) => {
+        if (show) {
+          window.addEventListener("keydown", handleKeyDown);
+        } else {
+          window.removeEventListener("keydown", handleKeyDown);
+        }
+      },
+      { immediate: true },
+    );
 
     onBeforeUnmount(() => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -91,9 +96,7 @@ export default defineComponent({
                   </div>
 
                   {/* Body 区域：通过默认插槽自由扩展内容 */}
-                  <div class="text-sm text-zinc-400">
-                    {slots.default?.()}
-                  </div>
+                  <div class="text-sm text-zinc-400">{slots.default?.()}</div>
 
                   {/* Footer 按钮区域：支持默认按钮或完全自定义的 footer 插槽 */}
                   <div class="flex justify-end gap-3 mt-2">
@@ -101,20 +104,20 @@ export default defineComponent({
                       slots.footer()
                     ) : (
                       <>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
+                          shape="pill"
                           onClick={handleClose}
-                          class="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800 rounded-lg transition-colors duration-150 outline-none"
                         >
                           取消
-                        </button>
-                        <button
-                          type="button"
+                        </Button>
+                        <Button
+                          variant="primary"
+                          shape="pill"
                           onClick={handleConfirm}
-                          class="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-lg transition-colors duration-150 outline-none shadow-lg shadow-rose-950/20"
                         >
                           确认
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>

@@ -17,73 +17,92 @@ import { useChatContext } from "../composition/useChat";
 import Dialog from "./Dialog";
 import ConversationItem from "./ConversationItem";
 
-
 const textTransition =
   "overflow-hidden whitespace-nowrap transition-[opacity,max-width] duration-200 ease-out";
 
- const textClass = (collapsed : boolean) =>
-      clsx(
-        textTransition,
-        collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100",
-      );
+const textClass = (collapsed: boolean) =>
+  clsx(
+    textTransition,
+    collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100",
+  );
 
-    const itemClass = (collapsed : boolean,active = false) =>
-      clsx(
-        "group flex h-8 w-full items-center rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer select-none",
-        collapsed ? "justify-center px-0" : "gap-3 pl-3",
-        active
-          ? "bg-zinc-700/45 text-white hover:bg-zinc-700/60"
-          : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white",
-      );
+const itemClass = (collapsed: boolean, active = false) =>
+  clsx(
+    "group flex h-8 w-full items-center rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer select-none",
+    collapsed ? "justify-center px-0" : "gap-3 pl-3",
+    active
+      ? "bg-zinc-700/45 text-white hover:bg-zinc-700/60"
+      : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white",
+  );
 
 export default defineComponent({
   name: "Sidebar",
   setup() {
     const collapsed = ref(false);
     const isDeleteDialogOpen = ref(false);
-    const conversationToDelete = ref< string | null>(null);
+    const conversationToDelete = ref<string | null>(null);
     const isRenameDialogOpen = ref(false);
-    const conversationToRename = ref<{ id: string; title?: string | null } | null>(null);
+    const conversationToRename = ref<{
+      id: string;
+      title?: string | null;
+    } | null>(null);
     const renameTitle = ref("");
 
-    const { currentConversationId, setNewChat, selectConversation, deleteConversation, renameConversation } = useChatContext();
+    const {
+      currentConversationId,
+      setNewChat,
+      selectConversation,
+      deleteConversation,
+      renameConversation,
+    } = useChatContext();
 
     const conversationsQr = useQuery({
       queryKey: [fetchConversations.queryKey],
       queryFn: fetchConversations,
     });
 
-    const handleConversationClick = (conversationId : string) => {
+    const handleConversationClick = (conversationId: string) => {
       selectConversation(conversationId);
-    }
+    };
 
-    const handleConversationDeleteClick = (deleteConversationId : string) => {
+    const handleConversationDeleteClick = (deleteConversationId: string) => {
       conversationToDelete.value = deleteConversationId;
       isDeleteDialogOpen.value = true;
-    }
+    };
 
-    const handleConversationRenameClick = (conversation : any) => {
+    const handleConversationRenameClick = (conversation: any) => {
       conversationToRename.value = conversation;
       renameTitle.value = conversation.title || "";
       isRenameDialogOpen.value = true;
-    }
+    };
 
-    const handleConversationRenameDialogAction = async (action : 'confirm' | 'close') => {
-      if(action === 'confirm' && conversationToRename.value && renameTitle.value.trim()){
-        await renameConversation(conversationToRename.value.id, renameTitle.value.trim());
+    const handleConversationRenameDialogAction = async (
+      action: "confirm" | "close",
+    ) => {
+      if (
+        action === "confirm" &&
+        conversationToRename.value &&
+        renameTitle.value.trim()
+      ) {
+        await renameConversation(
+          conversationToRename.value.id,
+          renameTitle.value.trim(),
+        );
       }
       conversationToRename.value = null;
       renameTitle.value = "";
       isRenameDialogOpen.value = false;
-    }
+    };
 
-    const handleConversationDialogAction = async (action : 'confirm' | 'close') => {
-      if(action === 'confirm' && conversationToDelete.value){
+    const handleConversationDialogAction = async (
+      action: "confirm" | "close",
+    ) => {
+      if (action === "confirm" && conversationToDelete.value) {
         await deleteConversation(conversationToDelete.value);
       }
       conversationToDelete.value = null;
       isDeleteDialogOpen.value = false;
-    }
+    };
 
     const renderLoading = () => {
       return (
@@ -156,11 +175,18 @@ export default defineComponent({
             </header>
 
             <nav class="space-y-1 px-3">
-              <Button class={itemClass(collapsed.value, false)} title="新增会话" onClick={setNewChat}>
+              <Button
+                class={itemClass(collapsed.value, false)}
+                title="新增会话"
+                onClick={setNewChat}
+              >
                 <MessageSquarePlus size={17} class="shrink-0" />
                 <span class={textClass(collapsed.value)}>新增会话</span>
               </Button>
-              <Button class={itemClass(collapsed.value, false)} title="搜索会话内容">
+              <Button
+                class={itemClass(collapsed.value, false)}
+                title="搜索会话内容"
+              >
                 <Search size={17} class="shrink-0" />
                 <span class={textClass(collapsed.value)}>搜索会话内容</span>
               </Button>
@@ -176,7 +202,9 @@ export default defineComponent({
                 会话历史
               </div>
               <div class="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
-                {isConversationsLoading ? renderLoading() : renderConversations()}
+                {isConversationsLoading
+                  ? renderLoading()
+                  : renderConversations()}
               </div>
             </section>
 
@@ -207,20 +235,21 @@ export default defineComponent({
           <Dialog
             show={isDeleteDialogOpen.value}
             title="删除会话"
-            onClose={() => handleConversationDialogAction('close')}
-            onConfirm={() => handleConversationDialogAction('confirm')}
+            onClose={() => handleConversationDialogAction("close")}
+            onConfirm={() => handleConversationDialogAction("confirm")}
           >
             <div class="flex flex-col gap-3">
-              <p class="text-zinc-300">确定要删除这个历史会话吗？删除后此会话下的所有内容将无法恢复。</p>
-            
+              <p class="text-zinc-300">
+                确定要删除这个历史会话吗？删除后此会话下的所有内容将无法恢复。
+              </p>
             </div>
           </Dialog>
 
           <Dialog
             show={isRenameDialogOpen.value}
             title="重命名会话"
-            onClose={() => handleConversationRenameDialogAction('close')}
-            onConfirm={() => handleConversationRenameDialogAction('confirm')}
+            onClose={() => handleConversationRenameDialogAction("close")}
+            onConfirm={() => handleConversationRenameDialogAction("confirm")}
           >
             {{
               default: () => (
@@ -229,33 +258,40 @@ export default defineComponent({
                     type="text"
                     class="w-full bg-[#131314] hover:bg-[#181819] focus:bg-[#181819] text-zinc-100 text-sm px-4 py-3 rounded-[24px] border-0 outline-none placeholder:text-zinc-500 transition-colors"
                     value={renameTitle.value}
-                    onInput={(e) => (renameTitle.value = (e.target as HTMLInputElement).value)}
+                    onInput={(e) =>
+                      (renameTitle.value = (e.target as HTMLInputElement).value)
+                    }
                     placeholder="请输入新的会话名称"
                     ref={(el) => el && (el as HTMLInputElement).focus()}
                     onKeydown={(e) => {
-                      if (e.key === 'Enter') handleConversationRenameDialogAction('confirm');
+                      if (e.key === "Enter")
+                        handleConversationRenameDialogAction("confirm");
                     }}
                   />
                 </div>
               ),
               footer: () => (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => handleConversationRenameDialogAction('close')}
-                    class="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800 rounded-lg transition-colors duration-150 outline-none"
+                  <Button
+                  shape="pill"
+                    variant="secondary"
+                    onClick={() =>
+                      handleConversationRenameDialogAction("close")
+                    }
                   >
                     取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleConversationRenameDialogAction('confirm')}
-                    class="px-4 py-2 text-sm font-medium text-white bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors duration-150 outline-none shadow-lg shadow-zinc-950/20"
+                  </Button>
+                  <Button
+                   shape="pill"
+                    variant="primary"
+                    onClick={() =>
+                      handleConversationRenameDialogAction("confirm")
+                    }
                   >
                     保存
-                  </button>
+                  </Button>
                 </>
-              )
+              ),
             }}
           </Dialog>
         </>
