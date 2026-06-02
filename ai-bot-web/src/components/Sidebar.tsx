@@ -50,6 +50,7 @@ export default defineComponent({
 
     const {
       currentConversationId,
+      generatingConversationIds,
       setNewChat,
       selectConversation,
       deleteConversation,
@@ -120,6 +121,7 @@ export default defineComponent({
           {conversations.map((conversation) => (
             <ConversationItem
               key={conversation.id}
+              isGenerating={generatingConversationIds.value.includes(conversation.id)}
               conversation={conversation}
               isActive={conversation.id === unref(currentConversationId)}
               collapsed={collapsed.value}

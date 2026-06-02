@@ -34,8 +34,9 @@ export interface ChatContext {
   chatMessages: Readonly<Ref<readonly ChatMessage[]>>;
   isGenerating: Readonly<Ref<boolean>>;
   lastUserMessageId: ComputedRef<string | void>;
+  generatingConversationIds:ComputedRef<string[]>;
   sendMessage: (content: string) => Promise<void>;
-  updateMessage: (messageId: string, patch: ChatMessagePatch) => void;
+  updateMessage: (conversationId : string,  messageId: string, patch: ChatMessagePatch) => void;
   setNewChat: () => void;
   selectConversation: (conversationId: string) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
@@ -57,18 +58,30 @@ export const useChat = (): ChatContext => {
 
   const currentConversationId = ref<string | null>(null);
 
-  const chatMessages = ref<ChatMessage[]>([]);
+  //会话缓存, key 为conversationId ，value 为 消息列表
+  const conversationCache = ref<Record<string, ChatMessage[]>>({});
 
-  const activeAbortController = ref<AbortController | null>(null);
+  const chatMessages = computed(() => {
+    const cId = currentConversationId.value; 
+    if(!cId) return [];
+    return conversationCache.value[cId] || [];
+  })
 
-  const appendMessage = (message: ChatMessage) => {
-    // 第一步：把新消息追加到响应式消息列表中。
-    chatMessages.value.push(message);
+  const activeAbortControllers = ref<Record<string , AbortController | null>>({});
+
+  const appendMessage = (cId : string,  message: ChatMessage) => {
+    // 把新消息追加到响应式消息列表中。
+    if(Array.isArray(conversationCache.value[cId])){
+      conversationCache.value[cId].push(message);
+    }else{
+      conversationCache.value[cId] = [message];
+    }
   };
 
-  const updateMessage = (messageId: string, patch: ChatMessagePatch) => {
+  const updateMessage = (cId : string, messageId: string, patch: ChatMessagePatch) => {
     // 第一步：根据当前消息 ID 找到需要更新的消息。
-    const targetMessage = chatMessages.value.find(
+    const messages = conversationCache.value[cId] || [];
+    const targetMessage = messages.find(
       (message) => message.id === messageId,
     );
 
@@ -80,8 +93,8 @@ export const useChat = (): ChatContext => {
     Object.assign(targetMessage, patch);
   };
 
-  const deleteMessage = (messageId: string) => {
-    chatMessages.value = chatMessages.value.filter((m) => m.id !== messageId);
+  const deleteMessage = (cId : string, messageId: string) => {
+    conversationCache.value[cId] =  conversationCache.value[cId]?.filter((m) => m.id !== messageId) || [];
   };
 
   const isGenerating = computed(() =>
@@ -99,16 +112,19 @@ export const useChat = (): ChatContext => {
     userMessageId: string,
     assistantMessageId: string,
   ) => {
-    activeAbortController.value = new AbortController();
+    const {conversationId : cId} = requestBody;
+    //创建并存储该会话的Abort 信号
+    const abortController = new AbortController();
+    activeAbortControllers.value[cId] = abortController;
     try {
       let streamedContent = "";
       await streamChatRequest(
         {
           body: requestBody,
-          signal: activeAbortController.value.signal,
+          signal: abortController.signal,
           onChunk(payload) {
             streamedContent += payload.content;
-            updateMessage(assistantMessageId, {
+            updateMessage(cId, assistantMessageId, {
               content: streamedContent,
               status: "streaming",
               errorMessage: "",
@@ -116,11 +132,11 @@ export const useChat = (): ChatContext => {
           },
           onDone(payload) {
             if (payload.insertedUserMessageId) {
-              updateMessage(userMessageId, {
+              updateMessage(cId, userMessageId, {
                 id: payload.insertedUserMessageId,
               });
             }
-            updateMessage(assistantMessageId, {
+            updateMessage(cId, assistantMessageId, {
               id: payload.id,
               content: payload.reply,
               created: payload.created,
@@ -130,37 +146,38 @@ export const useChat = (): ChatContext => {
             queryClient.invalidateQueries({
               queryKey: [fetchConversations.queryKey],
             });
-            activeAbortController.value = null;
+            activeAbortControllers.value[cId] = null;
           },
           onError(payload) {
-            updateMessage(assistantMessageId, {
+            updateMessage(cId, assistantMessageId, {
               status: "error",
               errorMessage: payload.message,
             });
             console.error("网络错误或解析错误", payload.message);
-            activeAbortController.value = null;
+            activeAbortControllers.value[cId] = null;
           },
         },
         path,
       );
     } catch (error) {
-      activeAbortController.value = null;
+      activeAbortControllers.value[cId] = null;
       if (error instanceof Error && error.name === "AbortError") {
-        const assistantMsg = chatMessages.value.find(
+        const messages = conversationCache.value[cId] || [];
+        const assistantMsg = messages.find(
           (m) => m.id === assistantMessageId,
         );
         if (assistantMsg && assistantMsg.content.trim() === "") {
           console.log("未开始吐字即被终止，移除空气泡占位");
-          deleteMessage(assistantMessageId);
+          deleteMessage(cId,  assistantMessageId);
         } else {
-          updateMessage(assistantMessageId, {
+          updateMessage(cId, assistantMessageId, {
             status: "done", // 将状态改为 done，停止 loading 状态
             errorMessage: "", // 清空错误信息
           });
         }
         return;
       }
-      updateMessage(assistantMessageId, {
+      updateMessage(cId, assistantMessageId, {
         status: "error",
         errorMessage: error instanceof Error ? error.message : "发送消息失败。",
       });
@@ -175,7 +192,7 @@ export const useChat = (): ChatContext => {
     if (!trimmedContent || isGenerating.value) {
       return;
     }
-
+    
     //如果当前是新增会话的话， 先建立会话
     if (!currentConversationId.value) {
       // 只取前100字， 作为会话名称
@@ -187,12 +204,12 @@ export const useChat = (): ChatContext => {
         queryKey: [fetchConversations.queryKey],
       });
     }
-
+    const cId = currentConversationId.value;
     const userMessageId = getRamdomId();
     const assistantMessageId = getRamdomId();
 
     // 第二步：用户消息立即显示，并标记为已完成。
-    appendMessage({
+    appendMessage(cId, {
       id: userMessageId,
       role: "user",
       content: trimmedContent,
@@ -202,12 +219,12 @@ export const useChat = (): ChatContext => {
 
     // 第三步：只把用户消息加入请求历史，避免把空的 assistant 占位消息发给模型。
     const requestBody: SendChatRequest = {
-      conversationId: currentConversationId.value!,
+      conversationId: cId!,
       content: trimmedContent,
     };
 
     // 第四步：追加 assistant 占位消息，用 sending 状态触发 ChatMessage loading。
-    appendMessage({
+    appendMessage(cId, {
       id: assistantMessageId,
       role: "assistant",
       content: "",
@@ -226,7 +243,6 @@ export const useChat = (): ChatContext => {
   const setNewChat = () => {
     if (!currentConversationId.value) return;
     currentConversationId.value = null;
-    chatMessages.value = [];
   };
 
   //获取会话消息历史
@@ -236,17 +252,27 @@ export const useChat = (): ChatContext => {
   } = useMutation({
     mutationFn: getConversationMessagesApi,
   });
-  const selectConversation = async (conversationId: string) => {
+  const selectConversation = async (cId: string) => {
     if (
       isConversationMessagesFetching.value ||
-      !conversationId ||
-      conversationId === unref(currentConversationId)
+      !cId ||
+      cId === unref(currentConversationId)
     )
       return;
     try {
-      const result = await getConversationMessagesAsync(conversationId);
-      currentConversationId.value = conversationId;
-      chatMessages.value =
+      const getIsGenerating = () => conversationCache.value[cId]?.some(m => m.role === 'assistant' && ['sending', 'streaming'].includes(m.status));
+      const messages = conversationCache.value[cId] || [];
+      //判断目标会话是否在前端缓存中被标记为“正在生成中”
+      const isTargetGenerating = getIsGenerating();
+      currentConversationId.value = cId;
+      if (isTargetGenerating) {
+      return;
+    }
+      const result = await getConversationMessagesAsync(cId);
+      // 如果请求期间该会话恰好又发起了生成，则不进行覆盖
+      const isCurrentGenerating = getIsGenerating();
+      if(isCurrentGenerating) return;
+      conversationCache.value[cId] =
         result.messages?.map((message) => normalizeHistoryMessage(message)) ||
         [];
     } catch (error) {
@@ -263,16 +289,22 @@ export const useChat = (): ChatContext => {
     mutationFn: deleteConversationApi,
   });
 
-  const deleteConversation = async (conversationId: string) => {
-    if (!conversationId || isDeleteConversationLoading.value) return;
+  const deleteConversation = async (cId: string) => {
+    if (!cId || isDeleteConversationLoading.value) return;
     try {
-      const result = await deleteConversationAsync(conversationId);
+      if(activeAbortControllers.value[cId]){
+        activeAbortControllers.value[cId].abort();
+        delete activeAbortControllers.value[cId];
+      }
+      const result = await deleteConversationAsync(cId);
       if (!result) throw Error("删除会话失败");
       toast.success("会话删除成功");
+      // 2. 从缓存字典中彻底释放当前会话的内存
+      delete conversationCache.value[cId];
       queryClient.invalidateQueries({
         queryKey: [fetchConversations.queryKey],
       });
-      if (currentConversationId.value === conversationId) {
+      if (currentConversationId.value === cId) {
         setNewChat();
       }
     } catch (error) {
@@ -311,9 +343,10 @@ export const useChat = (): ChatContext => {
 
   // 终止生成
   const stopGenerating = () => {
-    if (activeAbortController.value) {
-      activeAbortController.value.abort();
-      activeAbortController.value = null;
+    const cId = currentConversationId.value;
+    if (cId &&  activeAbortControllers.value[cId]) {
+      activeAbortControllers.value[cId].abort();
+      delete activeAbortControllers.value[cId];
     }
   };
 
@@ -324,13 +357,14 @@ export const useChat = (): ChatContext => {
     );
     return userMessages[userMessages.length - 1]?.id;
   });
+
   const regenerateContent: ChatContext["regenerateContent"] = async (
     messageId: string,
     regenerateContent: string,
   ) => {
     const trimmedRegenerateContent = regenerateContent.trim();
-    const conversationId = unref(currentConversationId);
-    if (!trimmedRegenerateContent || !conversationId) return;
+    const cId = unref(currentConversationId);
+    if (!trimmedRegenerateContent || !cId) return;
     const messageIndex = chatMessages.value.findIndex(
       (message) => message.id === messageId,
     );
@@ -340,12 +374,12 @@ export const useChat = (): ChatContext => {
     )
       return;
     //截断后续数组
-    chatMessages.value = chatMessages.value.slice(0, messageIndex);
+    conversationCache.value[cId] = conversationCache.value[cId].slice(0, messageIndex)
 
     const userMessageId = getRamdomId();
     const assistantMessageId = getRamdomId();
     //创建新的用户消息
-    appendMessage({
+    appendMessage(cId, {
       id: userMessageId,
       role: "user",
       content: trimmedRegenerateContent,
@@ -353,7 +387,7 @@ export const useChat = (): ChatContext => {
       created: Date.now(),
     });
     //创建assisant 消息
-    appendMessage({
+    appendMessage(cId, {
       id: assistantMessageId,
       role: "assistant",
       content: "",
@@ -364,7 +398,7 @@ export const useChat = (): ChatContext => {
     await executeChatStream(
       {
         messageId,
-        conversationId,
+        conversationId : cId,
         regenerateContent: trimmedRegenerateContent,
       },
       "/regenerateChat",
@@ -373,11 +407,17 @@ export const useChat = (): ChatContext => {
     );
   };
 
+  //正在生成的会话ids
+  const generatingConversationIds = computed(() => {
+    return Object.keys(activeAbortControllers.value).filter(key => !!activeAbortControllers.value[key]);
+  })
+
   return {
     currentConversationId: readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
     isGenerating: readonly(isGenerating),
     lastUserMessageId,
+    generatingConversationIds,
     sendMessage,
     updateMessage,
     setNewChat,

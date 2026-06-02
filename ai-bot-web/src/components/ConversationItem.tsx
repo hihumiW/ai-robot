@@ -1,4 +1,4 @@
-import {  MoreVertical, Pencil, Trash2 } from "@lucide/vue";
+import { LoaderCircle, MoreVertical, Pencil, Trash2 } from "@lucide/vue";
 import clsx from "clsx";
 import { defineComponent, PropType, ref } from "vue";
 import {
@@ -20,7 +20,7 @@ const textClass = (collapsed: boolean) =>
 const itemClass = (collapsed: boolean, active = false) =>
   clsx(
     "group flex h-8 w-full items-center rounded-full text-sm font-medium transition-colors duration-150 cursor-pointer select-none",
-    collapsed ? "justify-center px-0" : "gap-3 px-3",
+    collapsed ? "justify-center px-0" : "gap-1 px-3",
     active
       ? "bg-zinc-700/45 text-white hover:bg-zinc-700/60"
       : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white",
@@ -41,6 +41,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    isGenerating: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["select", "delete", "rename"],
   setup(props, { emit }) {
@@ -51,15 +55,22 @@ export default defineComponent({
       return (
         <div
           class={itemClass(props.collapsed, activeState)}
-          title={props.conversation.title || '新会话'}
+          title={props.conversation.title || "新会话"}
           onClick={() => emit("select", props.conversation.id)}
         >
-    
           <span
             class={["truncate text-left flex-1", textClass(props.collapsed)]}
           >
-            {props.conversation.title || '新会话'}
+            {props.conversation.title || "新会话"}
           </span>
+
+          {/* 增加转圈动画条件渲染 */}
+          {props.isGenerating && (
+            <LoaderCircle
+              size={14}
+              class="animate-spin shrink-0 text-zinc-400"
+            />
+          )}
           {!props.collapsed && (
             <Dropdown
               placement="bottom-end"
