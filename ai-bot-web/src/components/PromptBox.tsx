@@ -1,13 +1,44 @@
-import { ChevronDown, Mic, Plus, SendHorizontal, Square } from "@lucide/vue";
+import {
+  Check,
+  ChevronDown,
+  Mic,
+  Plus,
+  SendHorizontal,
+  Square,
+} from "@lucide/vue";
 import { defineComponent, nextTick, ref } from "vue";
 import { useChatContext } from "../composition/useChat";
 import Button from "./Button";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownContent,
+  DropdownItem,
+  DropdownSeparator,
+} from "./DropdownMenu";
+import { Option } from "../types/shared";
+import { ChatReasoningEffort } from "../types/chat";
 
 type PromptBoxProps = {
   compact?: boolean;
 };
 
 const maxTextareaHeight = 120;
+
+const CHAT_THINKING_OPTIONS: Option<ChatReasoningEffort>[] = [
+  {
+    label: "低",
+    value: "low",
+  },
+  {
+    label: "中",
+    value: "medium",
+  },
+  {
+    label: "高",
+    value: "high",
+  },
+];
 
 export default defineComponent<PromptBoxProps>({
   name: "PromptBox",
@@ -18,7 +49,13 @@ export default defineComponent<PromptBoxProps>({
     },
   },
   setup(props) {
-    const { isGenerating, sendMessage, stopGenerating } = useChatContext();
+    const {
+      isGenerating,
+      thinkingIntensity,
+      sendMessage,
+      stopGenerating,
+      setThinkingIntensity,
+    } = useChatContext();
     const textareaRef = ref<HTMLTextAreaElement | null>(null);
     const chatBoxContent = ref("");
 
@@ -69,7 +106,7 @@ export default defineComponent<PromptBoxProps>({
     return () => (
       <div
         class={[
-          "flex w-full items-center gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 shadow-[0_18px_60px_rgba(0,0,0,0.34)] transition-colors hover:bg-[#252526]",
+          "flex w-full items-center gap-3 rounded-[28px] bg-[#1f1f20] px-4 py-3 text-sm text-zinc-400 transition-colors ",
           props.compact ? "min-h-14" : "min-h-16",
         ]}
       >
@@ -89,6 +126,39 @@ export default defineComponent<PromptBoxProps>({
           style={{ maxHeight: `${maxTextareaHeight}px` }}
         />
 
+        {/* 思考强度选择下拉菜单静态 UI */}
+        <Dropdown placement="bottom-end" offset={16}>
+          <DropdownTrigger>
+            <Button
+              variant="ghost"
+              shape="pill"
+              class=" hover:bg-zinc-700/80 text-zinc-300 hover:text-white"
+            >
+              <div class="flex gap-x-2 items-center ">
+                <span>Thinking</span>
+                <ChevronDown size={14} class="text-zinc-400" />
+              </div>
+            </Button>
+          </DropdownTrigger>
+          <DropdownContent>
+            <div class="px-3 py-2 text-sm text-zinc-300">思考强度</div>
+            <DropdownSeparator />
+            {CHAT_THINKING_OPTIONS.map((option) => (
+              <DropdownItem
+                key={option.value}
+                onClick={() => setThinkingIntensity(option.value)}
+              >
+                <div class="flex justify-between items-center">
+                  {option.label}
+                  {option.value === thinkingIntensity.value && (
+                    <Check size={14} />
+                  )}
+                </div>
+              </DropdownItem>
+            ))}
+          </DropdownContent>
+        </Dropdown>
+
         <div class="flex shrink-0 items-center gap-1.5 text-zinc-300">
           <Button variant="ghost" size="icon-md" shape="pill">
             <Mic size={18} />
@@ -98,10 +168,10 @@ export default defineComponent<PromptBoxProps>({
             variant="primary"
             size="icon-md"
             shape="pill"
-            title={isGenerating.value ? '停止生成' : '发送'}
+            title={isGenerating.value ? "停止生成" : "发送"}
           >
             {isGenerating.value ? (
-              <Square size={16}/>
+              <Square size={16} />
             ) : (
               <SendHorizontal size={16} />
             )}

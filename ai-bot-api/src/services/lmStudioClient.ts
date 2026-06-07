@@ -4,6 +4,7 @@ import type {
   LmStudioChatCompletionRequest,
   LmStudioChatCompletionResponse,
   LmStudioChatCompletionStreamChunk,
+  ReasoningEffort,
 } from "../types/chat.js";
 import { AppError } from "../utils/AppError.js";
 import { getSystemPrompt } from "../utils/prompt.js";
@@ -19,8 +20,13 @@ export interface ChatCompletionStreamDelta {
   content: string;
 }
 
+export interface ChatCompletionCreateParams {
+  reasoning_effort?: ReasoningEffort;
+}
+
 export const createChatCompletion = async (
   history: ChatMessageDto[],
+  completionParams?: ChatCompletionCreateParams,
 ): Promise<LmStudioChatCompletionResponse> => {
   // 第一步：组装非流式请求体，保留给后续调试或兼容场景使用。
   const requestBody: LmStudioChatCompletionRequest = {
@@ -28,6 +34,7 @@ export const createChatCompletion = async (
     messages: [systemMessage, ...history],
     temperature: 1,
     stream: false,
+    reasoning_effort: completionParams?.reasoning_effort || "medium",
   };
 
   // 第二步：调用 LM Studio 的 OpenAI-compatible chat completions 接口。
@@ -67,6 +74,7 @@ const parseLmStudioStreamData = (
 
 export const openChatCompletionStream = async (
   history: ChatMessageDto[],
+  completionParams?: ChatCompletionCreateParams,
 ): Promise<AsyncGenerator<ChatCompletionStreamDelta>> => {
   // 第一步：组装开启 stream 的 LM Studio 请求体。
   const requestBody: LmStudioChatCompletionRequest = {
@@ -74,6 +82,7 @@ export const openChatCompletionStream = async (
     messages: [systemMessage, ...history],
     temperature: 1,
     stream: true,
+    reasoning_effort: completionParams?.reasoning_effort || "medium",
   };
 
   // 第二步：先发起模型请求，确保模型连接成功后再让控制器写 SSE 响应头。
@@ -161,7 +170,7 @@ export const openChatCompletionStream = async (
         // 主动通知底层流：消费者已经不想要数据了，立即关闭与大模型的 HTTP 连接！
         await reader.cancel();
       } catch (error) {
-         console.error("取消下游大模型流失败:", error);
+        console.error("取消下游大模型流失败:", error);
       }
       // 第九步：无论正常结束还是异常中断，都释放底层 reader。
       reader.releaseLock();

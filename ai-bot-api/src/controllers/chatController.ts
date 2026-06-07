@@ -4,6 +4,7 @@ import type {
   ChatMessageDto,
   ChatRequestDto,
   ChatResponseDto,
+  ReasoningEffort,
   RegenerateChatRequestDto,
 } from "../types/chat.js";
 import { AppError } from "../utils/AppError.js";
@@ -60,6 +61,7 @@ interface ChatStreamOptions {
   insertedUserMessageId: string;
   isNewConversation?: boolean;
   originalUserPrompt?: string; // postChat 时传，用来生成标题
+  reasoningEffort?: ReasoningEffort;
 }
 const handleStream = async ({
   res,
@@ -68,6 +70,7 @@ const handleStream = async ({
   insertedUserMessageId,
   isNewConversation = false,
   originalUserPrompt,
+  reasoningEffort,
 }: ChatStreamOptions) => {
   // 1. 注册连接关闭监听
   let isAborted = false;
@@ -80,7 +83,10 @@ const handleStream = async ({
 
   try {
     // 2. 连接模型并设置 SSE 响应头
-    const completionStream = await openChatCompletionStream(llmHistoryMessages);
+    const completionStream = await openChatCompletionStream(
+      llmHistoryMessages,
+      { reasoning_effort: reasoningEffort },
+    );
     setSseRespHeader(res);
     let assistantReply = "";
     let completionId = `chatcmpl-${Date.now()}`;
@@ -185,7 +191,7 @@ export const postChat: RequestHandler<
       );
     }
 
-    const { conversationId, content } = parsedBody.data;
+    const { conversationId, content, reasoningEffort } = parsedBody.data;
 
     //将当前的对话新增到历史记录中
     const insertedUserMessage = await createMessage({
@@ -212,6 +218,7 @@ export const postChat: RequestHandler<
       insertedUserMessageId: insertedUserMessage.id,
       originalUserPrompt: content,
       isNewConversation: historyMessages.length === 1,
+      reasoningEffort,
     });
   } catch (error) {
     // 第七步：如果还没开始 SSE，就交给统一错误中间件返回 JSON 错误。
@@ -235,7 +242,7 @@ export const regenerateChat: RequestHandler<
         parsedBody.error.flatten(),
       );
     }
-    const { conversationId, messageId, regenerateContent } = parsedBody.data;
+    const { conversationId, messageId, regenerateContent, reasoningEffort } = parsedBody.data;
     //查询出该会话的所有历史
     const historyMessages = await listMessagesByConversationId(conversationId);
     // 删除更新会话后面的所有记录
@@ -279,6 +286,7 @@ export const regenerateChat: RequestHandler<
       insertedUserMessageId: insertedUserMessage.id,
       llmHistoryMessages: llmHistoryMessages,
       isNewConversation: false,
+      reasoningEffort
     });
   } catch (error) {
     return next(error);

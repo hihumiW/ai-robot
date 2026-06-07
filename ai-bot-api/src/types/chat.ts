@@ -18,11 +18,14 @@ export interface ChatResponseDto {
   generatedTitle? : string;
 }
 
+export type ReasoningEffort  = 'none' | 'minimal' | 'low' | 'medium' | 'high' |  'xhigh';
+
 export interface LmStudioChatCompletionRequest {
   model: string;
   messages: ChatMessageDto[];
   temperature: number;
   stream: boolean;
+  reasoning_effort? : ReasoningEffort; 
 }
 
 export interface LmStudioChatCompletionResponse {

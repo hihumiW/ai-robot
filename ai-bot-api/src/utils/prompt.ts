@@ -3,5 +3,5 @@ export const getChatSummaryTitlePrompt = (userContent : string , assistantConten
 }
 
 export const getSystemPrompt = () => {
-    return  `你是一个专业的 AI 助手。请使用中文直接输出最终的回答，绝对不要包含任何形如 <think> 的思考、推理、草稿或内心独白过程。`;
+    return  `你是一个专业的 AI 助手。请使用中文直接输出最终的回答。`;
 }

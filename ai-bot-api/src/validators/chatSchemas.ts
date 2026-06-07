@@ -10,6 +10,7 @@ export const chatMessageSchema = z.object({
 export const chatRequestSchema = z.object({
   conversationId : z.string().nonempty(),
   content : z.string().nonempty(),
+  reasoningEffort : z.enum(['none', 'low', 'medium', 'high']).optional()
 });
 
 export const getConversationMessageParamsSchema =  z.object({
@@ -22,4 +23,5 @@ export const regenerateChatRequestSchema = z.object({
   conversationId : z.string().nonempty(),
   messageId : z.string().nonempty(),
   regenerateContent : z.string().nonempty(),
+  reasoningEffort : z.enum(['none', 'low', 'medium', 'high']).optional()
 })

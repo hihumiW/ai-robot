@@ -2,6 +2,8 @@ export type ChatRole = "user" | "assistant" | "system";
 
 export type ChatMessageStatus = "sending" | "streaming" | "done" | "error";
 
+export type ChatReasoningEffort = 'none' | "low" | "medium" | "high";
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -18,12 +20,16 @@ export type ChatMessagePatch = Partial<
 export interface SendChatRequest {
   conversationId: string;
   content: string;
+  // 思考等级
+  reasoningEffort?: ChatReasoningEffort;
 }
 
 export interface RegenerateChatRequest {
   conversationId: string;
   messageId: string;
   regenerateContent: string;
+  // 思考等级
+  reasoningEffort?: ChatReasoningEffort;
 }
 
 export interface SendChatResponse {
@@ -42,7 +48,7 @@ export interface ChatStreamDoneEvent {
   reply: string;
   isNewConversation?: boolean;
   generatedTitle?: string;
-  insertedUserMessageId : string;
+  insertedUserMessageId: string;
 }
 
 export interface ChatStreamErrorEvent {

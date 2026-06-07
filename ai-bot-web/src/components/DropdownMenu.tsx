@@ -21,6 +21,7 @@ export interface DropdownContext {
   visible: Ref<boolean>;
   triggerEl: Ref<HTMLElement | null>;
   placement: string;
+  offset: number;
   open: () => void;
   close: () => void;
   toggle: () => void;
@@ -35,6 +36,10 @@ export const Dropdown = defineComponent({
     placement: {
       type: String as PropType<"bottom-start" | "bottom-end">,
       default: "bottom-end",
+    },
+    offset: {
+      type: Number,
+      default: 4,
     },
   },
   emits: ["open", "close"],
@@ -62,6 +67,7 @@ export const Dropdown = defineComponent({
       visible,
       triggerEl,
       placement: props.placement,
+      offset: props.offset,
       open,
       close,
       toggle,
@@ -122,8 +128,9 @@ export const DropdownContent = defineComponent({
 
       const triggerRect = trigger.getBoundingClientRect();
       const contentRect = content.getBoundingClientRect();
+      const offset = context.offset ?? 4;
 
-      let top = triggerRect.bottom + window.scrollY + 4;
+      let top = triggerRect.bottom + window.scrollY + offset;
       let left = triggerRect.left + window.scrollX;
 
       // 如果靠左对齐时，菜单右侧超出了屏幕右边界
@@ -140,7 +147,7 @@ export const DropdownContent = defineComponent({
       // 屏幕下边界安全防护
       if (top + contentRect.height > window.innerHeight + window.scrollY) {
         // 如果下方空间不足，则向上弹出
-        top = triggerRect.top + window.scrollY - contentRect.height - 4;
+        top = triggerRect.top + window.scrollY - contentRect.height - offset;
       }
 
       coords.value = { top, left };
