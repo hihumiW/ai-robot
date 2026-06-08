@@ -8,6 +8,7 @@ export interface AppConfig {
   dbPassword: string;
   dbName: string;
   dbConnectionLimit: number;
+  tavilyApiKey : string;
 }
 
 export const config: AppConfig = {
@@ -17,7 +18,9 @@ export const config: AppConfig = {
   dbHost: process.env.DB_HOST ?? "127.0.0.1",
   dbPort: Number(process.env.DB_PORT ?? 3306),
   dbUser: process.env.DB_USER ?? "root",
-  dbPassword: process.env.DB_PASSWORD ?? "admin@123",
+  dbPassword: process.env.DB_PASSWORD ?? "",
   dbName: process.env.DB_NAME ?? "ai_bot",
   dbConnectionLimit: Number(process.env.DB_CONNECTION_LIMIT ?? 10),
+  tavilyApiKey : process.env.tavilyApiKey ?? '',
 };
+

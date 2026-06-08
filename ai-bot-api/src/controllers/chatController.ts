@@ -27,6 +27,7 @@ import {
   updateConversationTitle,
   updateConversationUpdateAt,
 } from "../repositories/conversationRepository.js";
+import { successResponse } from "../utils/apiResponse.js";
 
 type ChatStreamEvent = "chunk" | "done" | "error";
 
@@ -242,7 +243,8 @@ export const regenerateChat: RequestHandler<
         parsedBody.error.flatten(),
       );
     }
-    const { conversationId, messageId, regenerateContent, reasoningEffort } = parsedBody.data;
+    const { conversationId, messageId, regenerateContent, reasoningEffort } =
+      parsedBody.data;
     //查询出该会话的所有历史
     const historyMessages = await listMessagesByConversationId(conversationId);
     // 删除更新会话后面的所有记录
@@ -286,9 +288,25 @@ export const regenerateChat: RequestHandler<
       insertedUserMessageId: insertedUserMessage.id,
       llmHistoryMessages: llmHistoryMessages,
       isNewConversation: false,
-      reasoningEffort
+      reasoningEffort,
     });
   } catch (error) {
     return next(error);
   }
+};
+
+export const testChat: RequestHandler<null, ApiResponse<any>, any> = async (
+  req,
+  res,
+  next,
+) => {
+  const history = [
+    {
+      role: "user",
+      content: req.body.query,
+    },
+  ] as any;
+  const response = await createChatCompletion(history);
+
+  return res.json(successResponse(response));
 };
