@@ -3,6 +3,7 @@ export type ChatRole = "user" | "assistant" | "system" | "tool";
 export interface ChatMessageDto {
   role: ChatRole;
   content: string;
+  images? : string[]; //Base64 图片字符串数组
   tool_call_id?: string;
   tool_calls?: ChatCompletionToolCall[];
 }
@@ -10,6 +11,7 @@ export interface ChatMessageDto {
 export interface ChatRequestDto {
   conversationId: string;
   content: string;
+  images?: string[];
 }
 
 export interface ChatResponseDto {
@@ -30,7 +32,13 @@ export type ReasoningEffort =
 
 export interface LmStudioChatCompletionRequest {
   model: string;
-  messages: ChatMessageDto[];
+  messages: Array<{
+    role: ChatRole;
+    content: string | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    >;
+  }>;
   temperature: number;
   stream: boolean;
   reasoning_effort?: ReasoningEffort;

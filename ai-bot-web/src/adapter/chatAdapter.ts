@@ -18,6 +18,7 @@ export const normalizeHistoryMessage = (messageDto : MessageDto) : ChatMessage =
     id : messageDto.id,
     role : messageDto.role,
     content : messageDto.content,
+    images: messageDto.images,
     // 后端返回来的createds是 ISO格式的时间字符串
     created : dayjs(messageDto.createdAt).unix(),
     // 历史消息， 默认都成功

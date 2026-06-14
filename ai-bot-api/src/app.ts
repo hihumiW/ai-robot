@@ -8,7 +8,8 @@ import { messageRouter } from "./routes/messageRoutes.js";
 
 export const app = express();
 
-app.use(express.json());
+//防止包含base64的内容时，超出容量
+app.use(express.json({ limit: "20mb" }));
 
 app.use("/api", chatRouter);
 app.use("/api", conversationRouter);

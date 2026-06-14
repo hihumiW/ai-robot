@@ -11,6 +11,7 @@ interface MessageRow extends RowDataPacket {
   content: string;
   sequence_no: number;
   created_at: Date;
+  images: string | null; 
 }
 
 interface NextSequenceRow extends RowDataPacket {
@@ -26,6 +27,7 @@ const toMessageDto = (row: MessageRow): MessageDto => {
     content: row.content,
     sequenceNo: row.sequence_no,
     createdAt: row.created_at.toISOString(),
+    images : row.images ?  JSON.parse(row.images) : void 0,
   };
 };
 
@@ -33,6 +35,7 @@ export const createMessage = async (params: {
   conversationId: string;
   role: ChatRole;
   content: string;
+  images?: string[];
 }): Promise<MessageDto> => {
   // 第一步：查询当前会话的下一个消息序号，保证读取历史时可以稳定排序。
   const [sequenceRows] = await mysqlPool.execute<NextSequenceRow[]>(
@@ -44,11 +47,12 @@ export const createMessage = async (params: {
 
   // 第二步：生成消息 ID，同样使用 32 位字符串。
   const messageId = randomUUID().replaceAll("-", "");
+  const imagesJson = params.images ? JSON.stringify(params.images) : null;
 
   // 第三步：把消息写入 messages 表。
   await mysqlPool.execute(
-    "INSERT INTO messages (id, conversation_id, role, content, sequence_no) VALUES (?, ?, ?, ?, ?)",
-    [messageId, params.conversationId, params.role, params.content, sequenceNo],
+    "INSERT INTO messages (id, conversation_id, role, content, sequence_no, images) VALUES (?, ?, ?, ?, ?, ?)",
+    [messageId, params.conversationId, params.role, params.content, sequenceNo, imagesJson],
   );
 
   // 第四步：重新查询刚创建的消息，保证返回的是数据库真实数据。
@@ -66,7 +70,7 @@ export const findMessageById = async (
 ): Promise<MessageDto | null> => {
   // 第一步：按主键查询单条消息。
   const [rows] = await mysqlPool.execute<MessageRow[]>(
-    "SELECT id, conversation_id, role, content, sequence_no, created_at FROM messages WHERE id = ? LIMIT 1",
+    "SELECT id, conversation_id, role, content, sequence_no, created_at, images FROM messages WHERE id = ? LIMIT 1",
     [messageId],
   );
 
@@ -85,7 +89,7 @@ export const listMessagesByConversationId = async (
 ): Promise<MessageDto[]> => {
   // 第一步：按 sequence_no 正序读取会话历史，确保消息顺序和写入顺序一致。
   const [rows] = await mysqlPool.execute<MessageRow[]>(
-    "SELECT id, conversation_id, role, content, sequence_no, created_at FROM messages WHERE conversation_id = ? ORDER BY sequence_no ASC",
+    "SELECT id, conversation_id, role, content, sequence_no, created_at, images FROM messages WHERE conversation_id = ? ORDER BY sequence_no ASC",
     [conversationId],
   );
 

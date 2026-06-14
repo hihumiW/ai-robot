@@ -9,6 +9,7 @@ import "highlight.js/styles/atom-one-dark.css"; // Vite 会自动把这个 CSS �
 import clsx from "clsx";
 import Button from "./Button";
 import { useToast } from "../composition/useToast";
+import { useChatContext } from "../composition/useChat";
 
 const md: MarkdownIt = new MarkdownIt({
   html: true, // 允许解析原生的 HTML 标签
@@ -105,7 +106,11 @@ export default defineComponent({
     },
     content: {
       type: String,
-      required: true,
+      default: "",
+    },
+    images: {
+      type: Array as PropType<readonly string[]>,
+      default: () => [],
     },
     status: {
       type: String as PropType<ChatMessageStatus>,
@@ -130,6 +135,7 @@ export default defineComponent({
   emits: ["regenerateContent"],
   setup(props, { emit }) {
     const toast = useToast();
+    const { openPreview } = useChatContext();
     const isEditing = ref(false);
     const editContent = ref<string>(props.content);
 
@@ -240,8 +246,21 @@ export default defineComponent({
                   </div>
                 </div>
               ) : (
-                <div class="max-w-[76%] whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950">
-                  {content}
+                <div class="flex flex-col items-end gap-2 max-w-[76%]">
+                  {props.images && props.images.map((img) => (
+                    <img
+                      key={img.slice(0, 30)}
+                      src={img}
+                      class="max-w-xs max-h-60 rounded-xl object-contain border border-zinc-700/50 shadow-md cursor-zoom-in hover:brightness-95 active:scale-[0.98] transition-all"
+                      onClick={() => openPreview(img)}
+                      title="点击预览大图"
+                    />
+                  ))}
+                  {content && (
+                    <div class="w-full whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950">
+                      {content}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

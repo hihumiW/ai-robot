@@ -38,7 +38,7 @@ export interface ChatContext {
   generatingConversationIds: ComputedRef<string[]>;
   //思考等级
   thinkingIntensity: Ref<Readonly<ChatReasoningEffort>>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, images?: string[]) => Promise<void>;
   updateMessage: (
     conversationId: string,
     messageId: string,
@@ -54,6 +54,9 @@ export interface ChatContext {
     regenerateContent: string,
   ) => Promise<void>;
   setThinkingIntensity: (thinkingIntensity: ChatReasoningEffort) => void;
+  previewImageUrl: Readonly<Ref<string | null>>;
+  openPreview: (url: string) => void;
+  closePreview: () => void;
 }
 
 export const CHAT_CONTEXT_INJECT_KEY: InjectionKey<ChatContext> =
@@ -197,7 +200,7 @@ export const useChat = (): ChatContext => {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, images?: string[]) => {
     // 第一步：清理用户输入，空内容不发起请求。
     const trimmedContent = content.trim();
 
@@ -225,6 +228,7 @@ export const useChat = (): ChatContext => {
       id: userMessageId,
       role: "user",
       content: trimmedContent,
+      images: images,
       status: "done",
       created: Date.now(),
     });
@@ -233,6 +237,7 @@ export const useChat = (): ChatContext => {
     const requestBody: SendChatRequest = {
       conversationId: cId!,
       content: trimmedContent,
+      images: images,
       reasoningEffort : thinkingIntensity.value,
     };
 
@@ -444,6 +449,14 @@ export const useChat = (): ChatContext => {
     localStorage.setItem('ai_bot_thinking_intensity', val);
   }
 
+  const previewImageUrl = ref<string | null>(null);
+  const openPreview = (url: string) => {
+    previewImageUrl.value = url;
+  };
+  const closePreview = () => {
+    previewImageUrl.value = null;
+  };
+
   return {
     currentConversationId: readonly(currentConversationId),
     chatMessages: readonly(chatMessages),
@@ -459,7 +472,10 @@ export const useChat = (): ChatContext => {
     renameConversation,
     stopGenerating,
     regenerateContent,
-    setThinkingIntensity
+    setThinkingIntensity,
+    previewImageUrl: readonly(previewImageUrl),
+    openPreview,
+    closePreview,
   };
 };
 

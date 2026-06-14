@@ -7,6 +7,7 @@ export interface MessageDto {
   content: string;
   sequenceNo: number;
   createdAt: string;
+  images?: string[];
 }
 
 export interface GetConversationMessageResponseDto {

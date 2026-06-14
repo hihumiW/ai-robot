@@ -8,18 +8,20 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
+  images?: readonly string[];
   status: ChatMessageStatus;
   created: number;
   errorMessage?: string;
 }
 
 export type ChatMessagePatch = Partial<
-  Pick<ChatMessage, "id" | "content" | "status" | "created" | "errorMessage">
+  Pick<ChatMessage, "id" | "content" | "status" | "created" | "errorMessage" | "images">
 >;
 
 export interface SendChatRequest {
   conversationId: string;
   content: string;
+  images?: string[];
   // 思考等级
   reasoningEffort?: ChatReasoningEffort;
 }

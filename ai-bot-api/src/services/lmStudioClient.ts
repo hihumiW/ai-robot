@@ -37,6 +37,36 @@ const systemMessage: ChatMessageDto = {
   content: getSystemPrompt(),
 };
 
+//将包含图片的ChatMessageDto 转换为 OpenAI标准的Message
+const mapToLmStudioMessage = (msg: ChatMessageDto) => {
+  if (msg.images && msg.images.length > 0) {
+    //将图片和文字转换为对多模态的格式
+    const contentPart: any[] = [
+      {
+        type: "text",
+        text: msg.content,
+      },
+    ];
+    for (const imgBase64 of msg.images) {
+      contentPart.push({
+        type: "image_url",
+        image_url: {
+          url: imgBase64,
+        },
+      });
+    }
+
+    return {
+      role: msg.role,
+      content: contentPart,
+    };
+  }
+  return {
+    role: msg.role,
+    content: msg.content,
+  };
+};
+
 export interface ChatCompletionStreamDelta {
   id?: string;
   created?: number;
@@ -54,7 +84,7 @@ export const createChatCompletion = async (
   // 第一步：组装非流式请求体，保留给后续调试或兼容场景使用。
   const requestBody: LmStudioChatCompletionRequest = {
     model: config.lmStudioModel,
-    messages: [systemMessage, ...history],
+    messages: [systemMessage, ...history].map(message => mapToLmStudioMessage(message)),
     temperature: 1,
     stream: false,
     reasoning_effort: completionParams?.reasoning_effort || "medium",
@@ -141,7 +171,7 @@ export const openChatCompletionStream = async (
   // 第一步：组装开启 stream 的 LM Studio 请求体。
   const requestBody: LmStudioChatCompletionRequest = {
     model: config.lmStudioModel,
-    messages: [systemMessage, ...history],
+    messages: [systemMessage, ...history].map(message => mapToLmStudioMessage(message)),
     temperature: 1,
     stream: true,
     reasoning_effort: completionParams?.reasoning_effort || "medium",
@@ -259,7 +289,6 @@ export const openChatCompletionStream = async (
       // 第九步：无论正常结束还是异常中断，都释放底层 reader。
       reader.releaseLock();
     }
-
 
     // 第十步：读取完毕后检查是否有工具调用
     if (toolCalls.length > 0) {

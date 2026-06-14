@@ -21,6 +21,7 @@ export default defineComponent({
               id={message.id}
               role={message.role}
               content={message.content}
+              images={message.images}
               status={message.status}
               isLastUserMessage={
                 !isGenerating.value && message.id === lastUserMessageId.value

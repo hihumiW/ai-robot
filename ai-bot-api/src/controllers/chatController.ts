@@ -45,6 +45,7 @@ const toChatMessageDto = (message: MessageDto): ChatMessageDto => {
   return {
     role: message.role,
     content: message.content,
+    images : message.images,
   };
 };
 
@@ -192,13 +193,14 @@ export const postChat: RequestHandler<
       );
     }
 
-    const { conversationId, content, reasoningEffort } = parsedBody.data;
+    const { conversationId, content, reasoningEffort, images } = parsedBody.data;
 
     //将当前的对话新增到历史记录中
     const insertedUserMessage = await createMessage({
       conversationId,
       role: "user",
       content,
+      images
     });
 
     if (!insertedUserMessage) {
@@ -262,6 +264,9 @@ export const regenerateChat: RequestHandler<
       );
     }
     console.log(deleteMessageIds, "deleteMessageIds");
+     // 在删除旧消息前，先获取即将被重新生成的原用户消息的图片
+    const originalMessage = historyMessages[currentMessageIndex];
+    const originalImages = originalMessage?.images;
     //删除当前消息后面的ids
     const result = await deleteMessageByIds(deleteMessageIds);
     if (!result) {
@@ -273,6 +278,7 @@ export const regenerateChat: RequestHandler<
       conversationId,
       role: "user",
       content: regenerateContent,
+      images : originalImages
     });
     if (!insertedUserMessage) {
       throw new AppError(500, "INTERNAL_SERVER_ERROR", "插入用户更新消息失败");

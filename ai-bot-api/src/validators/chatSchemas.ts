@@ -10,6 +10,7 @@ export const chatMessageSchema = z.object({
 export const chatRequestSchema = z.object({
   conversationId : z.string().nonempty(),
   content : z.string().nonempty(),
+  images : z.array(z.string()).optional(),
   reasoningEffort : z.enum(['none', 'low', 'medium', 'high']).optional()
 });
 

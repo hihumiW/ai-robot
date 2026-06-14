@@ -29,6 +29,7 @@ export interface MessageDto {
   conversationId: string;
   role: ChatRole;
   content: string;
+  images?: string[];
   sequenceNo: number;
   createdAt: string;
 }

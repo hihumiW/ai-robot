@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import WelcomePanel from './components/WelcomePanel';
 import { CHAT_CONTEXT_INJECT_KEY, useChat } from './composition/useChat';
 import ToastContainer from './components/ToastContainer';
+import ImagePreviewModal from './components/ImagePreviewModal';
 
 export default defineComponent({
   name: 'App',
@@ -21,6 +22,7 @@ export default defineComponent({
         <Sidebar />
         {messageView.value === 'chat' ? <ChatPanel /> : <WelcomePanel />}
         <ToastContainer />
+        <ImagePreviewModal />
       </main>
     );
   }
