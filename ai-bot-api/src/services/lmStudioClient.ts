@@ -71,6 +71,7 @@ export interface ChatCompletionStreamDelta {
   id?: string;
   created?: number;
   content: string;
+  reasoning_content?: string;
 }
 
 export interface ChatCompletionCreateParams {
@@ -270,11 +271,16 @@ export const openChatCompletionStream = async (
           }
 
           const content = parsedData?.choices?.[0]?.delta?.content;
-          if (content) {
+          const reasoningContent = parsedData?.choices?.[0]?.delta?.reasoning_content 
+            || (parsedData?.choices?.[0]?.delta as any)?.reasoning
+            || (parsedData?.choices?.[0]?.delta as any)?.thinking;
+
+          if (reasoningContent || content) {
             yield {
               id: parsedData?.id,
               created: parsedData?.created,
-              content,
+              content: content ?? "",
+              reasoning_content: reasoningContent ?? "",
             };
           }
         }

@@ -1,6 +1,6 @@
 import { Copy, Edit, LoaderCircle } from "@lucide/vue";
 import type { PropType, VNodeChild } from "vue";
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, nextTick } from "vue";
 import MarkdownIt from "markdown-it";
 import type { ChatMessageStatus, ChatRole } from "../types/chat";
 
@@ -131,6 +131,14 @@ export default defineComponent({
     isLastUserMessage: {
       type: Boolean,
     },
+    thinkingContent: {
+      type: String,
+      default: "",
+    },
+    isThinking: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["regenerateContent"],
   setup(props, { emit }) {
@@ -138,6 +146,21 @@ export default defineComponent({
     const { openPreview } = useChatContext();
     const isEditing = ref(false);
     const editContent = ref<string>(props.content);
+    const thinkingContainerRef = ref<HTMLDivElement | null>(null);
+
+    watch(
+      () => props.thinkingContent,
+      (newVal) => {
+        if (newVal) {
+          nextTick(() => {
+            if (thinkingContainerRef.value) {
+              thinkingContainerRef.value.scrollTop =
+                thinkingContainerRef.value.scrollHeight;
+            }
+          });
+        }
+      },
+    );
 
     const handleMessageAction = (action: string) => {
       if (action === "copy") {
@@ -177,6 +200,27 @@ export default defineComponent({
         </article>
       </div>
     );
+
+    const renderThinking = () => {
+      return (
+        <div class="mt-5 flex w-full flex-col gap-2 assistant-message">
+          <div class="flex items-center gap-2 px-6 text-xs text-zinc-500 font-medium">
+            <LoaderCircle size={14} class="animate-spin text-zinc-400" />
+            <span>AI 正在思考...</span>
+          </div>
+          <div class="flex w-full items-start gap-3">
+            <article class="min-w-0 flex-1 px-6">
+              <div
+                ref={thinkingContainerRef}
+                class="w-full h-32 overflow-y-auto rounded-2xl bg-[#131314]/80 border border-zinc-800/80 px-5 py-4 text-xs leading-relaxed text-zinc-400 font-mono scrollbar-thin select-text"
+              >
+                {props.thinkingContent}
+              </div>
+            </article>
+          </div>
+        </div>
+      );
+    };
 
     const renderAssistantMessage = (content: string) => {
       const htmlContent = md.render(content);
@@ -276,6 +320,11 @@ export default defineComponent({
       // 第三步：assistant 失败时显示错误提示，避免界面静默。
       if (props.status === "error") {
         return renderError();
+      }
+
+      // 正在思考中且有思考内容，则渲染思考容器
+      if (props.isThinking) {
+        return renderThinking();
       }
 
       // 第四步：其他 assistant 状态正常渲染文本内容。

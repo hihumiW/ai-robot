@@ -134,18 +134,30 @@ export const useChat = (): ChatContext => {
     activeAbortControllers.value[cId] = abortController;
     try {
       let streamedContent = "";
+      let streamedReasoning = "";
       await streamChatRequest(
         {
           body: requestBody,
           // 终止信号
           signal: abortController.signal,
           onChunk(payload) {
-            streamedContent += payload.content;
-            updateMessage(cId, assistantMessageId, {
-              content: streamedContent,
-              status: "streaming",
-              errorMessage: "",
-            });
+            if (payload.reasoning_content) {
+              streamedReasoning += payload.reasoning_content;
+              updateMessage(cId, assistantMessageId, {
+                thinkingContent: streamedReasoning,
+                isThinking: true,
+                status: "streaming",
+                errorMessage: "",
+              });
+            } else if (payload.content) {
+              streamedContent += payload.content;
+              updateMessage(cId, assistantMessageId, {
+                content: streamedContent,
+                isThinking: false,
+                status: "streaming",
+                errorMessage: "",
+              });
+            }
           },
           onDone(payload) {
             if (payload.insertedUserMessageId) {
@@ -158,6 +170,7 @@ export const useChat = (): ChatContext => {
               content: payload.reply,
               created: payload.created,
               status: "done",
+              isThinking: false,
               errorMessage: "",
             });
             queryClient.invalidateQueries({
@@ -168,6 +181,7 @@ export const useChat = (): ChatContext => {
           onError(payload) {
             updateMessage(cId, assistantMessageId, {
               status: "error",
+              isThinking: false,
               errorMessage: payload.message,
             });
             console.error("网络错误或解析错误", payload.message);
@@ -181,12 +195,13 @@ export const useChat = (): ChatContext => {
       if (error instanceof Error && error.name === "AbortError") {
         const messages = conversationCache.value[cId] || [];
         const assistantMsg = messages.find((m) => m.id === assistantMessageId);
-        if (assistantMsg && assistantMsg.content.trim() === "") {
+        if (assistantMsg && assistantMsg.content.trim() === "" && (!assistantMsg.thinkingContent || assistantMsg.thinkingContent.trim() === "")) {
           console.log("未开始吐字即被终止，移除空气泡占位");
           deleteMessage(cId, assistantMessageId);
         } else {
           updateMessage(cId, assistantMessageId, {
             status: "done", // 将状态改为 done，停止 loading 状态
+            isThinking: false,
             errorMessage: "", // 清空错误信息
           });
         }
@@ -194,6 +209,7 @@ export const useChat = (): ChatContext => {
       }
       updateMessage(cId, assistantMessageId, {
         status: "error",
+        isThinking: false,
         errorMessage: error instanceof Error ? error.message : "发送消息失败。",
       });
       console.error("网络错误或解析错误", error);
@@ -246,6 +262,8 @@ export const useChat = (): ChatContext => {
       id: assistantMessageId,
       role: "assistant",
       content: "",
+      thinkingContent: "",
+      isThinking: false,
       status: "sending",
       created: Date.now(),
     });
@@ -417,6 +435,8 @@ export const useChat = (): ChatContext => {
       id: assistantMessageId,
       role: "assistant",
       content: "",
+      thinkingContent: "",
+      isThinking: false,
       status: "sending",
       created: Date.now(),
     });

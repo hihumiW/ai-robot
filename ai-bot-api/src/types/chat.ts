@@ -63,6 +63,9 @@ export interface LmStudioChatCompletionStreamChunk {
   choices?: Array<{
     delta?: {
       content?: string;
+      reasoning_content?: string;
+      reasoning?: string;
+      thinking?: string;
       tool_calls?: any[];
     };
   }>;

@@ -29,6 +29,8 @@ export default defineComponent({
               loading={loading}
               hint="AI 正在思考..."
               errorMessage={message.errorMessage}
+              thinkingContent={message.thinkingContent}
+              isThinking={message.isThinking}
               onRegenerateContent={(content) =>
                 regenerateContent(message.id, content)
               }

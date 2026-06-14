@@ -12,10 +12,12 @@ export interface ChatMessage {
   status: ChatMessageStatus;
   created: number;
   errorMessage?: string;
+  thinkingContent?: string;
+  isThinking?: boolean;
 }
 
 export type ChatMessagePatch = Partial<
-  Pick<ChatMessage, "id" | "content" | "status" | "created" | "errorMessage" | "images">
+  Pick<ChatMessage, "id" | "content" | "status" | "created" | "errorMessage" | "images" | "thinkingContent" | "isThinking">
 >;
 
 export interface SendChatRequest {
@@ -42,6 +44,7 @@ export interface SendChatResponse {
 
 export interface ChatStreamChunkEvent {
   content: string;
+  reasoning_content?: string;
 }
 
 export interface ChatStreamDoneEvent {

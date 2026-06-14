@@ -105,6 +105,7 @@ const handleStream = async ({
       //给前端吐字
       writeSseEvent(res, "chunk", {
         content: delta.content,
+        reasoning_content: delta.reasoning_content,
       });
     }
 
