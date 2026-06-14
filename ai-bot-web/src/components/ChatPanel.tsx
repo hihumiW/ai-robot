@@ -29,9 +29,6 @@ export default defineComponent({
         <div class="absolute inset-x-0 bottom-7 px-5 sm:px-8 lg:px-12">
           <div class="mx-auto max-w-4xl">
             <PromptBox compact />
-            <p class="mt-3 text-center text-xs text-zinc-500">
-              AI Bot 目前是静态聊天界面，后续会接入本地模型和流式响应。
-            </p>
           </div>
         </div>
       </section>

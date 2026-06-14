@@ -291,15 +291,19 @@ export default defineComponent({
                 </div>
               ) : (
                 <div class="flex flex-col items-end gap-2 max-w-[76%]">
-                  {props.images && props.images.map((img) => (
-                    <img
-                      key={img.slice(0, 30)}
-                      src={img}
-                      class="max-w-xs max-h-60 rounded-xl object-contain border border-zinc-700/50 shadow-md cursor-zoom-in hover:brightness-95 active:scale-[0.98] transition-all"
-                      onClick={() => openPreview(img)}
-                      title="点击预览大图"
-                    />
-                  ))}
+                  {props.images && props.images.length > 0 && (
+                    <div class="flex flex-row flex-wrap justify-end gap-2 w-full">
+                      {props.images.map((img) => (
+                        <img
+                          key={img.slice(0, 30)}
+                          src={img}
+                          class="h-28 rounded-xl object-contain border border-zinc-700/50 shadow-md cursor-zoom-in hover:brightness-95 active:scale-[0.98] transition-all"
+                          onClick={() => openPreview(img)}
+                          title="点击预览大图"
+                        />
+                      ))}
+                    </div>
+                  )}
                   {content && (
                     <div class="w-full whitespace-pre-wrap rounded-[22px] bg-zinc-100 px-5 py-3 text-[15px] leading-7 text-zinc-950">
                       {content}
